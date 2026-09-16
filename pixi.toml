@@ -1,0 +1,60 @@
+[workspace]
+name = "soc-proxy"
+authors = ["Dano Hawkins <d.d.a.hawkins@tudelft.nl>"]
+version = "0.1.0"
+description = "State-of-charge proxy for time-series aggregation in energy system models"
+channels = [
+    "conda-forge",
+    "gurobi",
+]
+platforms = ["win-64", "linux-64"]
+
+[dependencies]
+python = "3.12.*"
+
+# Energy-system modelling
+calliope = ">=0.7.0"
+gurobi = "*"
+pyomo = "*"
+
+# Scientific stack
+numpy = "*"
+pandas = "*"
+scipy = "*"
+scikit-learn = "*"
+xarray = "*"
+netcdf4 = "*"
+
+# Results storage
+pyarrow = "*"
+
+# Configuration
+pyyaml = "*"
+
+# Analysis / plotting used by repository scripts
+matplotlib = "*"
+cycler = "*"
+mplcursors = "*"
+statsmodels = "*"
+
+# tsam
+tsam = ">=4.1.0"
+
+[pypi-dependencies]
+soc-proxy = { path = ".", editable = true }
+
+[feature.dev.dependencies]
+pytest = "*"
+pytest-cov = "*"
+ruff = "*"
+ipykernel = "*"
+
+[feature.dev.tasks]
+test = "pytest"
+lint = "ruff check ."
+format = "ruff format ."
+format-check = "ruff format --check ."
+
+[environments]
+default = { features = ["dev"], solve-group = "main" }
+delftblue = { features = [], solve-group = "main" }
