@@ -1,0 +1,55 @@
+
+import: # Import other files from paths relative to this file, or absolute paths
+  - "technologies.yaml" # This file specifies the model's technologies
+  - "locations.yaml" # This file specifies the model's nodes
+  - "scenarios.yaml" # Scenario and override group definitions 
+
+# Model configuration: all settings that affect the built model
+# --8<-- [start:config]
+config:
+  init:
+    name: Netherlands_Simple_Weather_Year_Model
+    # What version of Calliope this model is intended for
+    mode: base # Choices: base, operate
+    subset.timesteps: ["2010-01-01", "2010-12-31"] # Subset of timesteps
+    broadcast_input_data: true  # allow single indexed parameter data entries to be broadcast across all index items, if there are multiple entries.
+    math_paths: 
+      maths_cyclic_constraints: "../custom_mathematics/add_maths_cycle_constraints.yaml"
+    extra_math: [maths_cyclic_constraints]
+        
+
+  build:
+    ensure_feasibility: false # Switches on the "unmet demand" constraint 
+  solve:
+    solver: gurobi
+    zero_threshold: 1e-10 # Any value coming out of the backend that is smaller than this (due to floating point errors, probably) will be set to zero
+    shadow_prices: [
+      "storage_max", # shadow price of energy capacity i.e. increasing storage cap, usually only >0 for 1 time step
+      "balance_storage", # shadow price of storing one unit of energy to the next time step
+      "flow_out_max", # shadow price of power capacity i.e. electrolyser and h2 ccgt output
+      "flow_in_max",
+      ] 
+# --8<-- [end:config]
+
+# --8<-- [start:parameters]
+data_definitions:
+  objective_cost_weights: #TODO: I believe I can use this Cost Weights function to add weights to the different cost classes. It may be possible to use these for assinging weights to the dispatch across different years as part of the clustering method.
+    data: 1
+    index: monetary
+    dims: costs
+  # `bigM` sets the scale of unmet demand, which cannot be too high, otherwise the optimisation will not converge
+  bigM: 1e6
+  cost_interest_rate:
+    data: 0.10
+    index: monetary
+    dims: costs
+# --8<-- [end:parameters]
+
+data_tables:
+  time_varying_parameters:
+    data: ../data_tables/full_horizon/time_varying_parameters.csv
+    rows: timesteps
+    columns: [comment, nodes, techs, parameters]
+    drop: comment
+  
+

@@ -1,0 +1,16 @@
+.pixi/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/
+
+# Other generated outputs
+cache/
+results/
+data/signal_cache/
+data/cluster_maps/
+
+*.egg-info/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

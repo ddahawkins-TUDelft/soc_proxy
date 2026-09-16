@@ -1,0 +1,265 @@
+##
+# TECHNOLOGY DEFINITIONS
+##
+
+# Technologies:   Transmission, Supply (Onshore Wind, Offshore Wind, Solar, Nuclear), Conversion (Electrolysis, H2 to Electricity), Storage (Battery, H2 Salt Cavern)
+
+
+techs:
+  
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+  #
+  #                                     Supply 
+  #
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+
+  solar: #src:=https://ens.dk/sites/ens.dk/files/Analyser/technology_data_for_el_and_dh.xlsx
+    name: "Utility Solar Power"
+    color: '#FFC300'
+    base_tech: supply
+    carrier_out: power
+    lifetime: 35
+    source_unit: per_cap
+    #Capacity Factors are defined by the time_varying_parameters.csv file and implemented in model.yaml.
+    cost_flow_cap: #CAPEX cost
+      data: 0.560000 # €M / MW
+      index: monetary
+      dims: costs
+    cost_om_annual: #fixed O&M costs
+      data: 0.011300 # €M / MW / year
+      index: monetary
+      dims: costs
+  
+  onshore_wind: #src:=https://ens.dk/sites/ens.dk/files/Analyser/technology_data_for_el_and_dh.xlsx
+    name: "Onshore Wind"
+    color: '#db9204'
+    base_tech: supply
+    carrier_out: power
+    lifetime: 27
+    flow_cap_min: 0
+    source_unit: per_cap
+    #Capacity Factors are defined by the time_varying_parameters.csv file and implemented in model.yaml.
+    cost_flow_cap: #CAPEX cost
+      data: 1.110000 # €M / MW
+      index: monetary
+      dims: costs
+    cost_om_annual: #fixed O&M costs
+      data: 0.016400 # €M / MW / year
+      index: monetary
+      dims: costs
+    cost_flow_out: #variable maintenance costs
+      data: 0.000002 # €M / MWh
+      index: monetary
+      dims: costs
+
+  offshore_wind: #src:=https://ens.dk/sites/ens.dk/files/Analyser/technology_data_for_el_and_dh.xlsx
+    name: "Offshore Wind"
+    color: '#db5f04'
+    base_tech: supply
+    carrier_out: power
+    lifetime: 27
+    source_unit: per_cap
+    #Capacity Factors are defined by the time_varying_parameters.csv file and implemented in model.yaml.
+    cost_flow_cap: #CAPEX cost
+      data: 2.120000 # €M / kW
+      index: monetary
+      dims: costs
+    cost_om_annual: #fixed O&M costs
+      data: 0.050000 # €M / kW / year
+      index: monetary
+      dims: costs
+    cost_flow_out: #variable maintenance costs
+      data: 0.000005 # €M / kWh
+      index: monetary
+      dims: costs
+
+  nuclear: #src:= https://atb.nrel.gov/electricity/2024/nuclear#capital_expenditures_(capex)
+    name: 'Nuclear Power Plant'
+    color: '#db2a04'
+    base_tech: supply
+    carrier_out: power
+    lifetime: 40 
+
+    flow_ramping: 0.17 #src:=https://doi.org/10.1016/j.apenergy.2018.03.002
+    capacity_factor_min: 0.8 #set minimum capacity factor to 80% for nuclear for realistic op conditions.
+    cost_flow_cap: #CAPEX cost
+      data: 6.926000 # €M / MW
+      index: monetary
+      dims: costs
+    cost_om_annual: #fixed O&M costs
+      data: 0.166000 # €M / MW / year
+      index: monetary
+      dims: costs
+    cost_flow_out: #variable maintenance costs
+      data: 0.0000027 # €M / MWh
+      index: monetary
+      dims: costs
+    cost_flow_in: #variable fuel costs
+      data: 0.000004378 # €M / MWh
+      index: monetary
+      dims: costs
+
+
+    
+
+
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+  #
+  #                                     Storage 
+  #
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+
+  battery: #src:=https://ens.dk/en/our-services/technology-catalogues/technology-data-energy-storage
+    name: "Li-ion Battery storage"
+    color: '#581845'
+    base_tech: storage
+    carrier_in: power
+    carrier_out: power
+    storage_cap_max: 1000000 #selected arbitrarily to improve solver time, historic runs have not come close to this value
+    flow_cap_per_storage_cap_max: 3 #power to energy ratio, set to 3
+    flow_out_eff: 0.97
+    flow_in_eff: 0.98
+    storage_loss: 0 # No loss over time assumed, in reality more like 0.004 but considered negligible for this exercise
+    lifetime: 20
+    cyclic_storage: true
+    cost_storage_cap: #CAPEX cost in terms of storage energy capacity
+      data: 1.110000 # €M / MWh  
+      index: monetary
+      dims: costs
+    # cost_om_annual: #fixed O&M costs      #!!! Omitted fixed annual O&M costs for storage as these are not currently implemented in Calliope 0.7.0.dev4
+    #   data: 0.00000057 # €M / kWh / year #TODO, how does calliope make this in terms of kWh and not kW
+    #   index: monetary
+    #   dims: costs
+    cost_flow_out: #variable maintenance costs
+      data: 0.00000021 # €M / MWh
+      index: monetary
+      dims: costs
+    v_surplus_factor: 9 #  factor used where weighting of operational years is applied and storage surpluses must be accounted for.
+
+
+
+  h2_salt_cavern: #src:=https://ens.dk/en/our-services/technology-catalogues/technology-data-energy-storage
+    name: "Hydrogen Salt Cavern Storage"
+    color: '#900C3F'
+    base_tech: storage
+    carrier_in: hydrogen
+    carrier_out: hydrogen
+    # storage_cap_max: 43300000 #Limit for the Netherlands, src:= https://publications.tno.nl/publication/34637700/8sBxDu/TNO-2020-R12006.pdf
+    cyclic_storage: true 
+    # flow_cap_max:  #applies for operational case not planning
+    #   data: [18891.324544]
+    #   index: [hydrogen]
+    #   dims: carriers
+    # flow_cap_min:
+    #   data: [18891.324544]
+    #   index: [hydrogen]
+    #   dims: carriers
+    # 0.95 * 0.95 = 0.9025 round trip efficiency
+    flow_out_eff: 0.99
+    flow_in_eff: 0.99
+    storage_loss: 0 # No loss over time assumed
+    lifetime: 100
+    cycle_count_limit: 1 # custom maths components to limit number of dispatch cycles across the year
+    number_year_cycles: 1 #custom maths components to identify the number of modelled years (must be a better way of doing this)
+    cost_storage_cap: #CAPEX cost in terms of storage energy capacity
+      data: 0.003190 # €M / MWh   
+      index: monetary
+      dims: costs
+    # cost_om_annual: #fixed O&M costs    #!!! Omitted fixed annual O&M costs for storage as these are not currently implemented in Calliope 0.7.0.dev4
+    #   data: 0.00000006785 # Euro / kWh / year #TODO, how does calliope make this in terms of kWh and not kW
+    #   index: monetary
+    #   dims: costs
+    cost_flow_out: #variable maintenance costs
+      data: 0.000036 
+      index: monetary
+      dims: costs
+    v_surplus_factor: 9 #  factor used where weighting of operational years is applied and storage surpluses must be accounted for.
+
+
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+  #
+  #                                     Conversion 
+  #
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+  electrolyser: #src:=https://ens.dk/en/our-services/technology-catalogues/technology-data-renewable-fuels
+    name: "PEM Electrolyser"
+    color: '#713fe7'
+    base_tech: conversion
+    carrier_in: power
+    carrier_out: hydrogen
+    #source_use_max: #TODO: Defined by available hydrogen from storage. Perhaps the solution is to remove conversion facilities and wrap these into the Hydrogen storage technology as costs/power limits attached to the flow in/flow out, etc.
+    flow_out_eff: 0.65 #src:=IRENA, Accessed December 2024
+    lifetime: 25
+    # flow_cap_max:  #unnecessary for planninging model
+    #   data: [6636.550051, 4313.757533]
+    #   index: [power,hydrogen]
+    #   dims: carriers
+    # flow_cap_min:   #unnecessary for planninging model
+    #   data: [6636.550051, 4313.757533]
+    #   index: [power,hydrogen]
+    #   dims: carriers
+    cost_flow_cap: #CAPEX cost
+      data: 1.200000 # €M / MW
+      index: monetary
+      dims: costs
+    cost_om_annual: #fixed O&M costs
+      data: 0.024000 # €M / MW / year
+      index: monetary
+      dims: costs
+
+  h2_elec_conversion: #Conversion process is not a focus for this study, assuming a Hydrogen CCGT combusition process suffices. Natural Gas CCGT numbers (2020) taken from https://ens.dk/sites/ens.dk/files/Analyser/technology_data_for_el_and_dh.xlsx, uplifted by 8.5% as per Freitag et al. 2024 (https://doi.org/10.1016/j.ijhydene.2024.06.164)
+    name: 'H2 to Electricity Conversion'
+    color: '#3fa5e7'
+    base_tech: conversion
+    carrier_in: hydrogen
+    carrier_out: power
+    #source_use_max: #TODO: Defined by available electricity from surplus
+    flow_out_eff: 0.56  #src:=https://ens.dk/en/our-services/technology-catalogues/technology-data-energy-storage,assumption for Natural Gas, seems to align with Hydrogen CCGT studies (https://doi.org/10.1115/1.4026085)
+    # flow_cap_max:   #unecessary for planning model
+    #   data: [10579.141745, 18891.324544]
+    #   index: [power,hydrogen]
+    #   dims: carriers
+    # flow_cap_min:
+    #   data: [10579.141745, 18891.324544]
+    #   index: [power,hydrogen]
+    #   dims: carriers
+    lifetime: 25
+    cost_flow_cap: #CAPEX cost
+      data: 0.936000 # €M / MW
+      index: monetary
+      dims: costs
+    cost_om_annual: #fixed O&M costs
+      data: 0.031156 # €M / MW / year
+      index: monetary
+      dims: costs
+    cost_flow_out: #variable maintenance costs
+      data: 0.000004679 # €M / MWh
+      index: monetary
+      dims: costs
+      
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+  #
+  #                                     Demand 
+  #
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+
+  demand_power:
+    name: "Power demand"
+    color: '#000000'
+    base_tech: demand
+    carrier_in: power
+    #Demand time series is defined by the time_varying_parameters.csv file and implemented in model.yaml.
+
+
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+  #
+  #                                     Transmission 
+  #
+  # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
