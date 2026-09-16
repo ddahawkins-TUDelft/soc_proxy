@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 def normalise_by_method(data, method="mean"):
     """
     Normalizes the input (list, dict, or pandas Series) using one of:
@@ -17,22 +18,18 @@ def normalise_by_method(data, method="mean"):
     # Convert input to Series
     if isinstance(data, dict):
         s = pd.Series(data)
-        output_type = 'dict'
+        output_type = "dict"
     elif isinstance(data, (list, np.ndarray)):
         s = pd.Series(data)
-        output_type = 'list'
+        output_type = "list"
     elif isinstance(data, pd.Series):
         s = data.astype(float)
-        output_type = 'series'
+        output_type = "series"
     else:
         raise TypeError("Input must be a list, dictionary, or pandas Series.")
 
     # Compute normalization factor
-    factor = {
-        "sum": s.sum(),
-        "mean": s.mean(),
-        "max": s.max()
-    }[method]
+    factor = {"sum": s.sum(), "mean": s.mean(), "max": s.max()}[method]
 
     if factor == 0:
         raise ValueError("Normalization factor is zero — cannot normalize.")
@@ -40,9 +37,9 @@ def normalise_by_method(data, method="mean"):
     normed = s / factor
 
     # Convert back to original type
-    if output_type == 'dict':
-        return normed.to_dict(),factor
-    elif output_type == 'list':
+    if output_type == "dict":
+        return normed.to_dict(), factor
+    elif output_type == "list":
         return normed.tolist(), factor
-    elif output_type == 'series':
+    elif output_type == "series":
         return normed, factor

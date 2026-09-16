@@ -2,12 +2,14 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import sys
 
+
 def _human(nbytes: int) -> str:
-    for unit in ["B","KB","MB","GB","TB"]:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if nbytes < 1024 or unit == "TB":
             return f"{nbytes:.1f} {unit}" if unit != "B" else f"{nbytes} {unit}"
         nbytes /= 1024
     return f"{nbytes:.1f} TB"
+
 
 def clean_data_dirs(
     root: str | Path = "SoC_proxy_TSA/data",
@@ -27,9 +29,9 @@ def clean_data_dirs(
     root = Path(root)
     targets = {
         "calliope_models": root / "calliope_models",
-        "cluster_maps":    root / "cluster_maps",
-        "parameters":      root / "parameters",
-        "timeseries":      root / "timeseries",
+        "cluster_maps": root / "cluster_maps",
+        "parameters": root / "parameters",
+        "timeseries": root / "timeseries",
     }
 
     # Build deletion plan
@@ -45,7 +47,9 @@ def clean_data_dirs(
             if not p.is_file():
                 continue
             keep = False
-            if name == "timeseries" and p.name.lower().startswith("time_varying_parameters"):
+            if name == "timeseries" and p.name.lower().startswith(
+                "time_varying_parameters"
+            ):
                 keep = True
             elif name == "timeseries" and p.name.lower().startswith("synthetic"):
                 keep = True
@@ -53,7 +57,6 @@ def clean_data_dirs(
                 keep = True
             elif name == "calliope_models" and p.name.lower().startswith("standard"):
                 keep = True
-            
 
             if keep:
                 kept_plan[name].append(p)
@@ -75,8 +78,10 @@ def clean_data_dirs(
     for name in targets:
         d = targets[name]
         exists = " (missing)" if not d.exists() else ""
-        print(f" - {name}{exists}: delete {per_dir_counts[name]} files "
-              f"({_human(per_dir_bytes[name])}), keep {len(kept_plan[name])}")
+        print(
+            f" - {name}{exists}: delete {per_dir_counts[name]} files "
+            f"({_human(per_dir_bytes[name])}), keep {len(kept_plan[name])}"
+        )
         if preview_examples and delete_plan[name]:
             print("    e.g.:")
             for p in delete_plan[name][:preview_examples]:
@@ -107,7 +112,9 @@ def clean_data_dirs(
         # Optionally remove any empty subdirectories afterwards
         if remove_empty_dirs and targets[name].exists():
             # walk bottom-up so children get removed first
-            for sub in sorted(targets[name].rglob("*"), key=lambda x: len(x.parts), reverse=True):
+            for sub in sorted(
+                targets[name].rglob("*"), key=lambda x: len(x.parts), reverse=True
+            ):
                 if sub.is_dir():
                     try:
                         next(sub.iterdir())
@@ -119,15 +126,13 @@ def clean_data_dirs(
 
     print(f"Deleted {deleted} files, {_human(deleted_bytes)}.")
     return {
-        "deleted": {
-            "total_files": deleted,
-            "total_bytes": deleted_bytes
-        },
+        "deleted": {"total_files": deleted, "total_bytes": deleted_bytes},
         "per_dir": {
             name: {"files": per_dir_counts[name], "bytes": per_dir_bytes[name]}
             for name in targets
-        }
+        },
     }
+
 
 # Example usage:
 # clean_data_dirs("SoC_proxy_TSA/data")

@@ -18,8 +18,7 @@ for file in files:
 
     # Parse date (e.g. 01-Jan-10)
     df["SETTLEMENT_DATE"] = pd.to_datetime(
-        df["SETTLEMENT_DATE"].astype(str).str.strip(),
-        format="%d-%b-%Y"
+        df["SETTLEMENT_DATE"].astype(str).str.strip(), format="%d-%b-%Y"
     )
 
     # Convert 30 minute periods to an hour index:

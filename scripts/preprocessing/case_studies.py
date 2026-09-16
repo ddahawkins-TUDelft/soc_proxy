@@ -12,7 +12,7 @@ TIME_COLUMN = "timesteps"
 DATA_COLUMNS = ["solar", "offshore_wind", "onshore_wind", "demand_power"]
 
 EXPECTED_START = "2010-01-01 00:00"
-EXPECTED_END   = "2019-12-31 23:00"
+EXPECTED_END = "2019-12-31 23:00"
 FREQ = "H"
 
 OUTPUT_SUFFIX = "_cleaned.csv"
@@ -24,11 +24,7 @@ def clean_dataframe(df, name):
     df = df.copy()
 
     # ---- PARSE TIMESTAMP ----
-    df[TIME_COLUMN] = pd.to_datetime(
-        df[TIME_COLUMN],
-        dayfirst=True,
-        errors="coerce"
-    )
+    df[TIME_COLUMN] = pd.to_datetime(df[TIME_COLUMN], dayfirst=True, errors="coerce")
     df = df.dropna(subset=[TIME_COLUMN])
     df = df.set_index(TIME_COLUMN).sort_index()
 
@@ -39,11 +35,7 @@ def clean_dataframe(df, name):
     print(f"  Removed duplicates: {before - after}")
 
     # ---- EXPECTED FULL INDEX ----
-    full_index = pd.date_range(
-        start=EXPECTED_START,
-        end=EXPECTED_END,
-        freq=FREQ
-    )
+    full_index = pd.date_range(start=EXPECTED_START, end=EXPECTED_END, freq=FREQ)
 
     # ---- REINDEX (insert missing timestamps as NaNs) ----
     df = df.reindex(full_index)
@@ -54,8 +46,7 @@ def clean_dataframe(df, name):
     print(f"  Missing rows before interpolation: {missing_before}")
 
     df[DATA_COLUMNS] = df[DATA_COLUMNS].interpolate(
-        method="time",
-        limit_direction="both"
+        method="time", limit_direction="both"
     )
 
     missing_after = df[DATA_COLUMNS].isna().any(axis=1).sum()
@@ -76,7 +67,7 @@ def clean_dataframe(df, name):
         "demand_power",
         "solar",
         "offshore_wind",
-        "onshore_wind"
+        "onshore_wind",
     ]
     # Keep only those that exist (just in case)
     desired_order = [c for c in desired_order if c in out_df.columns]

@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 shuffle_years_config.py — Click-and-run generator for "year-shuffled" Calliope time series CSVs.
@@ -33,35 +32,32 @@ import pandas as pd
 CONFIG = {
     # Path to the original Calliope CSV (will NOT be modified)
     "CSV_PATH": "SoC_proxy_TSA/data_tables/full_horizon/time_varying_parameters.csv",
-
     # How many shuffled files to generate
     "N_FILES": 8,
-
     # Output timeline: consecutive years [TARGET_START_YEAR .. TARGET_START_YEAR + HORIZON_YEARS - 1]
     "TARGET_START_YEAR": 2010,
     "HORIZON_YEARS": 10,
-
     # Source year pool to sample from.
     # - Use None to auto-detect all years present in the CSV.
     # - Or provide a string like "2006-2019" OR "2006,2007,2009,2012".
     "YEAR_POOL": None,
-
     # Optional seed for reproducibility (set to an int or None for random)
     "SEED": 42,
 }
 # =========================
 
 
-
-
 def is_leap(y: int) -> bool:
     return calendar.isleap(y)
+
 
 def hours_in_year(y: int) -> int:
     return 8784 if is_leap(y) else 8760
 
+
 def consecutive_years(start_year: int, n_years: int) -> List[int]:
     return [start_year + i for i in range(n_years)]
+
 
 def parse_year_pool(spec: str) -> List[int]:
     """
@@ -69,16 +65,17 @@ def parse_year_pool(spec: str) -> List[int]:
     or a comma-separated list like "2006,2007,2009,2012".
     """
     spec = spec.strip()
-    if '-' in spec and ',' not in spec:
-        a, b = spec.split('-', 1)
+    if "-" in spec and "," not in spec:
+        a, b = spec.split("-", 1)
         return list(range(int(a), int(b) + 1))
     years = []
-    for tok in spec.split(','):
+    for tok in spec.split(","):
         tok = tok.strip()
         if not tok:
             continue
         years.append(int(tok))
     return years
+
 
 def load_calliope_csv(csv_path: Path) -> Tuple[List[str], pd.DataFrame]:
     """
@@ -89,25 +86,28 @@ def load_calliope_csv(csv_path: Path) -> Tuple[List[str], pd.DataFrame]:
       df: DataFrame with columns [0..M], where col 0 is the timestamp string
           and columns 1..M are numeric series; an extra '___YEAR___' column is added.
     """
-    with csv_path.open('r', newline='') as f:
+    with csv_path.open("r", newline="") as f:
         header_lines = [next(f) for _ in range(5)]
     df = pd.read_csv(csv_path, skiprows=5, header=None)
     if df.empty:
         raise ValueError("No data rows found after the first 5 header lines.")
-    ts = pd.to_datetime(df.iloc[:, 0], format="%Y/%m/%d %H:%M", errors='raise')
-    df.insert(1, '___YEAR___', ts.dt.year)
+    ts = pd.to_datetime(df.iloc[:, 0], format="%Y/%m/%d %H:%M", errors="raise")
+    df.insert(1, "___YEAR___", ts.dt.year)
     return header_lines, df
 
-def split_year_blocks(df: pd.DataFrame, available_years: Sequence[int]) -> dict[int, pd.DataFrame]:
+
+def split_year_blocks(
+    df: pd.DataFrame, available_years: Sequence[int]
+) -> dict[int, pd.DataFrame]:
     """
     Return dict {year: subframe} for requested available_years.
     Validates hour counts for each year and sorts by timestamp.
     """
     blocks: dict[int, pd.DataFrame] = {}
-    ts = pd.to_datetime(df.iloc[:, 0], format="%Y/%m/%d %H:%M", errors='raise')
+    ts = pd.to_datetime(df.iloc[:, 0], format="%Y/%m/%d %H:%M", errors="raise")
 
     for y in available_years:
-        mask = (ts.dt.year == y)
+        mask = ts.dt.year == y
         sub = df.loc[mask].copy()
         if sub.empty:
             continue
@@ -123,10 +123,9 @@ def split_year_blocks(df: pd.DataFrame, available_years: Sequence[int]) -> dict[
         raise ValueError("No complete year blocks found in the provided year pool.")
     return blocks
 
+
 def assign_sources_to_targets(
-    source_years_pool: Sequence[int],
-    target_years: Sequence[int],
-    rng: random.Random
+    source_years_pool: Sequence[int], target_years: Sequence[int], rng: random.Random
 ) -> List[int]:
     """
     Choose |target_years| distinct source years from source_years_pool,
@@ -159,10 +158,13 @@ def assign_sources_to_targets(
     iL = iN = 0
     for ty in target_years:
         if is_leap(ty):
-            assigned.append(pick_leaps[iL]); iL += 1
+            assigned.append(pick_leaps[iL])
+            iL += 1
         else:
-            assigned.append(pick_nonleaps[iN]); iN += 1
+            assigned.append(pick_nonleaps[iN])
+            iN += 1
     return assigned
+
 
 def reindex_block_to_year(sub: pd.DataFrame, out_year: int) -> pd.DataFrame:
     """
@@ -174,7 +176,8 @@ def reindex_block_to_year(sub: pd.DataFrame, out_year: int) -> pd.DataFrame:
     new_index = pd.date_range(start=start, periods=n, freq="H")
     out = sub.copy()
     out.iloc[:, 0] = new_index.strftime("%Y/%m/%d %H:%M")
-    return out.drop(columns=['___YEAR___'])
+    return out.drop(columns=["___YEAR___"])
+
 
 def generate_shuffled_files(
     csv_path: str | Path,
@@ -190,16 +193,23 @@ def generate_shuffled_files(
     csv_path = Path(csv_path).expanduser().resolve()
     header_lines, df = load_calliope_csv(csv_path)
 
-    ts = pd.to_datetime(df.iloc[:, 0], format="%Y/%m/%d %H:%M", errors='raise')
+    ts = pd.to_datetime(df.iloc[:, 0], format="%Y/%m/%d %H:%M", errors="raise")
     data_years = sorted(ts.dt.year.unique().tolist())
 
     if year_pool is None:
         pool_years = data_years
     else:
-        pool_years = [int(y) for y in (parse_year_pool(year_pool) if isinstance(year_pool, str) else year_pool)]
+        pool_years = [
+            int(y)
+            for y in (
+                parse_year_pool(year_pool) if isinstance(year_pool, str) else year_pool
+            )
+        ]
         pool_years = [y for y in pool_years if y in set(data_years)]
         if not pool_years:
-            raise ValueError("Provided YEAR_POOL has no overlap with years present in the CSV.")
+            raise ValueError(
+                "Provided YEAR_POOL has no overlap with years present in the CSV."
+            )
 
     blocks = split_year_blocks(df, pool_years)
 
@@ -226,7 +236,9 @@ def generate_shuffled_files(
 
     written = []
     for k in range(1, n_files + 1):
-        assigned_src_years = assign_sources_to_targets(list(blocks.keys()), target_years, rng)
+        assigned_src_years = assign_sources_to_targets(
+            list(blocks.keys()), target_years, rng
+        )
 
         out_parts = []
         for ty, sy in zip(target_years, assigned_src_years):
@@ -238,10 +250,12 @@ def generate_shuffled_files(
         out_name = f"{base}__shuffle_{src_order_label}__as_{target_label}__{k:02d}.csv"
         out_path = out_dir / out_name
 
-        with out_path.open('w', newline='') as f:
+        with out_path.open("w", newline="") as f:
             for line in header_lines:
                 f.write(line)
-            out_df.to_csv(f, header=False, index=False, float_format="%.10g", lineterminator="\n")
+            out_df.to_csv(
+                f, header=False, index=False, float_format="%.10g", lineterminator="\n"
+            )
 
         written.append(out_path)
 

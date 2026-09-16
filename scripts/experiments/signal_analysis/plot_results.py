@@ -39,6 +39,7 @@ from soc_proxy.calliope.timeseries import (
     extrapolate_ts_from_cluster_map,
 )
 
+
 # ------------------------------
 # Config / paths
 # ------------------------------
@@ -52,12 +53,16 @@ def derive_reference_paths_from_tvp(tvp_path: str) -> tuple[str, Path]:
     m = re.search(r"(?i)(shuffle[^/]*?)(?=\.csv\b)", str(tvp_path))
     if m:
         tag = m.group(1)
-        ref_nc  = f"SoC_proxy_TSA/data/calliope_models/{tag}.nc"
-        ref_tvp = Path(f"SoC_proxy_TSA/data/timeseries/time_varying_parameters__{tag}.csv")
+        ref_nc = f"SoC_proxy_TSA/data/calliope_models/{tag}.nc"
+        ref_tvp = Path(
+            f"SoC_proxy_TSA/data/timeseries/time_varying_parameters__{tag}.csv"
+        )
     else:
-        ref_nc  = "SoC_proxy_TSA/data/calliope_models/standard_2010_2019_reference.nc"
+        ref_nc = "SoC_proxy_TSA/data/calliope_models/standard_2010_2019_reference.nc"
         ref_tvp = Path("SoC_proxy_TSA/data/timeseries/time_varying_parameters.csv")
     return ref_nc, ref_tvp
+
+
 # Resample AFTER proxy build: 'D' for daily-mean metrics (recommended for LDES), or None for hourly
 RESAMPLE_FREQ: str | None = "D"
 
@@ -70,18 +75,22 @@ TS_WINDOW = ["2010-01-01", "2019-12-31"]
 DEMAND_FIELD = "demand_power"
 SOC_PROXY_PARAMS: Dict[str, Any] = {
     "capacity_weights": {"solar": 1, "onshore_wind": 0.5, "offshore_wind": 0.5},
-    "storage_process_losses": {"charging_efficiency": 0.65 * 0.99, "discharging_efficiency": 0.56 * 0.99},
+    "storage_process_losses": {
+        "charging_efficiency": 0.65 * 0.99,
+        "discharging_efficiency": 0.56 * 0.99,
+    },
     "dispatchable_techs": {"known_dispatchable_capacity": 3300},
     "soc_decomposition": {"method": "fft_lowpass", "time_horizon_hours": 24},
 }
 
 # Colors
-COLOUR_R = "#0d0887"   # Pearson r
-COLOUR_E = "#6a00a8"   # RMSE
+COLOUR_R = "#0d0887"  # Pearson r
+COLOUR_E = "#6a00a8"  # RMSE
 COLOUR_EC = "#b12a90"  # Combined
 COLOUR_TM = "#e16462"  # Timing of maxima
-COLOUR_5 = "#fca636"  
-COLOUR_MM = "#f0f921" # Magnitude of maxima
+COLOUR_5 = "#fca636"
+COLOUR_MM = "#f0f921"  # Magnitude of maxima
+
 
 # ------------------------------
 # Path helpers
@@ -89,14 +98,18 @@ COLOUR_MM = "#f0f921" # Magnitude of maxima
 def path_nc(model_id: str) -> str:
     return f"SoC_proxy_TSA/data/calliope_models/{model_id}.nc"
 
+
 def path_cluster_map(model_id: str) -> str:
     return f"SoC_proxy_TSA/data/cluster_maps/{model_id}.csv"
+
 
 def path_timeseries(model_id: str) -> str:
     return f"SoC_proxy_TSA/data/timeseries/{model_id}.csv"
 
+
 def path_params(model_id: str) -> str:
     return f"SoC_proxy_TSA/data/parameters/{model_id}.json"
+
 
 # ------------------------------
 # Generic helpers
@@ -106,6 +119,7 @@ def _maybe_resample(series: pd.Series, freq: str | None) -> pd.Series:
     if freq is None:
         return series
     return series.resample(freq).mean()
+
 
 def read_clustered_netcdf_with_attr_fix(path: str) -> calliope.Model:
     """Matches your attribute cleanup so Calliope doesn't think clustering is still 'active'."""
@@ -119,6 +133,7 @@ def read_clustered_netcdf_with_attr_fix(path: str) -> calliope.Model:
         g.setncattr("config", yaml.safe_dump(cfg))
     return calliope.read_netcdf(path)
 
+
 # ------------------------------
 # Parameter-file filtering (10y span, etc.)
 # ------------------------------
@@ -131,6 +146,7 @@ def _extract_year(val):
         if m:
             return int(m.group(0))
     return None
+
 
 def _read_span_from_params(params_path: str) -> Tuple[int | None, int | None]:
     """Read (start_year, end_year) from params JSON if present."""
@@ -157,6 +173,7 @@ def _read_span_from_params(params_path: str) -> Tuple[int | None, int | None]:
 
     return None, None
 
+
 def filter_ids_by_year_span(
     model_ids: Iterable[str], start_year: int = 2010, end_year: int = 2019
 ) -> List[str]:
@@ -173,29 +190,45 @@ def filter_ids_by_year_span(
             kept.append(mid)
     return kept
 
+
 # ------------------------------
 # Capacity helpers (ported from plot_cem_results.py)
 # ------------------------------
 def _get_capacities(m: calliope.Model) -> Tuple[pd.Series, pd.Series]:
     df_power = (
-        m.results["flow_cap"].fillna(0).to_series().dropna().to_frame("capacity").reset_index()
+        m.results["flow_cap"]
+        .fillna(0)
+        .to_series()
+        .dropna()
+        .to_frame("capacity")
+        .reset_index()
         .drop(columns=["nodes"], errors="ignore")
     )
-    mask_drop = (
-        df_power["techs"].isin(["battery", "h2_salt_cavern", "demand"])
-        | df_power["techs"].str.startswith("demand")
-    )
+    mask_drop = df_power["techs"].isin(
+        ["battery", "h2_salt_cavern", "demand"]
+    ) | df_power["techs"].str.startswith("demand")
     df_power = df_power[
         ~mask_drop
         & (
-            ((df_power["techs"] == "electrolyser") & (df_power["carriers"] == "hydrogen"))
-            | ((df_power["techs"] != "electrolyser") & (df_power["carriers"] == "power"))
+            (
+                (df_power["techs"] == "electrolyser")
+                & (df_power["carriers"] == "hydrogen")
+            )
+            | (
+                (df_power["techs"] != "electrolyser")
+                & (df_power["carriers"] == "power")
+            )
         )
     ]
     df_power.set_index("techs", inplace=True)
 
     df_energy = (
-        m.results["storage_cap"].fillna(0).to_series().dropna().to_frame("capacity").reset_index()
+        m.results["storage_cap"]
+        .fillna(0)
+        .to_series()
+        .dropna()
+        .to_frame("capacity")
+        .reset_index()
         .drop(columns=["nodes"], errors="ignore")
     )
     df_energy = df_energy[df_energy["capacity"] > 0]
@@ -203,10 +236,12 @@ def _get_capacities(m: calliope.Model) -> Tuple[pd.Series, pd.Series]:
 
     return df_power["capacity"], df_energy["capacity"]
 
+
 def _relative_error(ref: pd.Series, test: pd.Series) -> Tuple[pd.Series, float]:
     e = (ref - test) / ref
     e_mean_abs = float(np.mean(np.abs(e)))
     return e, e_mean_abs
+
 
 # ------------------------------
 # Proxy build & metrics
@@ -216,12 +251,16 @@ def _load_timeseries_reference(csv_path: Path, ts_window: List[str]) -> pd.DataF
     df.set_index("timesteps", inplace=True)
     return df.sort_index()
 
+
 def _load_timeseries_clustered(cluster_map_csv: str, csv_path: Path) -> pd.DataFrame:
     df, _ = extrapolate_ts_from_cluster_map(cluster_map_csv, csv_path)
     df.set_index("timesteps", inplace=True)
     return df.sort_index()
 
-def _build_proxy(df: pd.DataFrame, demand_field: str, params: Dict[str, Any]) -> pd.Series:
+
+def _build_proxy(
+    df: pd.DataFrame, demand_field: str, params: Dict[str, Any]
+) -> pd.Series:
     df_proxy, _, _ = generate_soc_proxy(
         df=df,
         demand_field=demand_field,
@@ -233,7 +272,10 @@ def _build_proxy(df: pd.DataFrame, demand_field: str, params: Dict[str, Any]) ->
     )
     return df_proxy["soc_proxy_LDES"].rename("soc_proxy_LDES")
 
-def _metrics_vs_reference_proxy(proxy_test: pd.Series, proxy_ref: pd.Series) -> Dict[str, float]:
+
+def _metrics_vs_reference_proxy(
+    proxy_test: pd.Series, proxy_ref: pd.Series
+) -> Dict[str, float]:
     R, T = proxy_ref.align(proxy_test, join="inner")
     pearson_r = float(R.corr(T))
     nrmse = float(np.sqrt(np.mean(np.square(R - T))) / np.max(R))
@@ -245,7 +287,9 @@ def _metrics_vs_reference_proxy(proxy_test: pd.Series, proxy_ref: pd.Series) -> 
     max_R, max_T = float(R.loc[t_max_R]), float(T.loc[t_max_T])
 
     maxima_magnitude_error = np.abs((max_R - max_T) / max_R)
-    maxima_timing_error = (t_max_delta / horizon) if horizon != pd.Timedelta(0) else np.nan
+    maxima_timing_error = (
+        (t_max_delta / horizon) if horizon != pd.Timedelta(0) else np.nan
+    )
 
     return {
         "pearson_r": pearson_r,
@@ -253,6 +297,7 @@ def _metrics_vs_reference_proxy(proxy_test: pd.Series, proxy_ref: pd.Series) -> 
         "e_timing_maxima": maxima_timing_error,
         "e_magnitude_maxima": maxima_magnitude_error,
     }
+
 
 # ------------------------------
 # Core baselines & per-model metrics
@@ -285,16 +330,22 @@ def compute_ldes_error(model_id: str, energy_caps_ref: pd.Series) -> float:
     e_storage, _ = _relative_error(energy_caps_ref, energy_caps_test)
     return float(np.abs(e_storage.get(STORAGE_TECH, np.nan)))
 
+
 def compute_proxy_metrics(
     model_id: str, soc_ref_proxy: pd.Series, resample_freq: str | None = None
 ) -> Dict[str, float]:
     """Pearson r, normalized RMSE, and peak timing/magnitude errors vs reference proxy."""
-    df_test = _load_timeseries_clustered(path_cluster_map(model_id), path_timeseries(model_id))
+    df_test = _load_timeseries_clustered(
+        path_cluster_map(model_id), path_timeseries(model_id)
+    )
     soc_test_proxy = _build_proxy(df_test, DEMAND_FIELD, SOC_PROXY_PARAMS)
     soc_test_proxy = _maybe_resample(soc_test_proxy, resample_freq)
     return _metrics_vs_reference_proxy(soc_test_proxy, soc_ref_proxy)
 
-def build_results(df_in: pd.DataFrame, resample_freq: str | None = RESAMPLE_FREQ) -> pd.DataFrame:
+
+def build_results(
+    df_in: pd.DataFrame, resample_freq: str | None = RESAMPLE_FREQ
+) -> pd.DataFrame:
     """
     df_in must contain:
       - 'id'         : model ids
@@ -305,36 +356,43 @@ def build_results(df_in: pd.DataFrame, resample_freq: str | None = RESAMPLE_FREQ
     cache: Dict[str, Dict[str, Any]] = {}  # key = reference_nc path
 
     for model_id, x_val, tvp in zip(df_in["id"], df_in["x_axis"], df_in["tvp"]):
-        print(f'Extracting results for {model_id}')
+        print(f"Extracting results for {model_id}")
         ref_nc, ref_tvp = derive_reference_paths_from_tvp(tvp)
 
         # memoize baselines per reference
         key = ref_nc
         if key not in cache:
-            cache[key] = compute_reference_baselines(ref_nc, ref_tvp, resample_freq=resample_freq)
+            cache[key] = compute_reference_baselines(
+                ref_nc, ref_tvp, resample_freq=resample_freq
+            )
         soc_ref_proxy = cache[key]["soc_ref_proxy"]
         energy_caps_ref = cache[key]["energy_caps_ref"]
 
         ldes_err = compute_ldes_error(model_id, energy_caps_ref)
-        metrics = compute_proxy_metrics(model_id, soc_ref_proxy, resample_freq=resample_freq)
+        metrics = compute_proxy_metrics(
+            model_id, soc_ref_proxy, resample_freq=resample_freq
+        )
 
-        rows.append({
-            "id": model_id,
-            "ldes_error": float(ldes_err),
-            "pearson_r": float(metrics["pearson_r"]),
-            "rmse": float(metrics["rmse"]),
-            "e_timing_maxima": float(metrics["e_timing_maxima"]),
-            "e_magnitude_maxima": float(metrics["e_magnitude_maxima"]),
-            "e_combined": (
-                float(metrics["e_magnitude_maxima"])
-                + float(metrics["e_timing_maxima"])
-                + float(metrics["rmse"])
-                + (1.0 - float(metrics["pearson_r"]))
-            ) / 4.0,
-            "x_axis": x_val,
-            "reference_nc": ref_nc,
-            "reference_tvp": str(ref_tvp),
-        })
+        rows.append(
+            {
+                "id": model_id,
+                "ldes_error": float(ldes_err),
+                "pearson_r": float(metrics["pearson_r"]),
+                "rmse": float(metrics["rmse"]),
+                "e_timing_maxima": float(metrics["e_timing_maxima"]),
+                "e_magnitude_maxima": float(metrics["e_magnitude_maxima"]),
+                "e_combined": (
+                    float(metrics["e_magnitude_maxima"])
+                    + float(metrics["e_timing_maxima"])
+                    + float(metrics["rmse"])
+                    + (1.0 - float(metrics["pearson_r"]))
+                )
+                / 4.0,
+                "x_axis": x_val,
+                "reference_nc": ref_nc,
+                "reference_tvp": str(ref_tvp),
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -357,6 +415,7 @@ def _trendline(ax, x, y, color, label_for_r2, lw=1.2):
         fontsize=9,
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=color, alpha=0.95),
     )
+
 
 def plot_ex_ante_ex_post_subplots(
     df: pd.DataFrame,
@@ -414,14 +473,16 @@ def plot_ex_ante_ex_post_subplots(
         linestyle="--",
         linewidth=1.6,
         color=COLOUR_5,
-        label="(timing ⊕ magnitude)"
+        label="(timing ⊕ magnitude)",
     )
     # R^2 annotation for the combo
     ax2.annotate(
         f"$R^2$={r_c**2:.2f}",
         xy=(np.nanmean(x), np.nanmean(e_peak_combo)),
-        xytext=(6, 8), textcoords="offset points",
-        fontsize=9, color=COLOUR_5,
+        xytext=(6, 8),
+        textcoords="offset points",
+        fontsize=9,
+        color=COLOUR_5,
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=COLOUR_5, lw=0.8, alpha=0.9),
     )
     ax2.set_ylabel("Peak errors")
@@ -448,10 +509,13 @@ def plot_ex_ante_ex_post_subplots(
         plt.savefig(savepath, bbox_inches="tight")
     plt.show()
 
+
 # ==============================
 # (B) Segmented (monthly) metrics per model
 # ==============================
-def segmented_metrics_by_month(proxy_test: pd.Series, proxy_ref: pd.Series) -> pd.DataFrame:
+def segmented_metrics_by_month(
+    proxy_test: pd.Series, proxy_ref: pd.Series
+) -> pd.DataFrame:
     """
     Compute per-month metrics on the overlap:
       - RMSE (per calendar Month)
@@ -473,12 +537,14 @@ def segmented_metrics_by_month(proxy_test: pd.Series, proxy_ref: pd.Series) -> p
             return float(g["ref"].corr(g["test"]))
         return np.nan
 
-    grouped = df.groupby("month").apply(lambda g: pd.Series({
-        "rmse": _rmse(g),
-        "pearson_r_m": _pearson(g)
-    })).reset_index()
+    grouped = (
+        df.groupby("month")
+        .apply(lambda g: pd.Series({"rmse": _rmse(g), "pearson_r_m": _pearson(g)}))
+        .reset_index()
+    )
 
     return grouped
+
 
 def build_segmented_results(
     df_in: pd.DataFrame,
@@ -496,12 +562,16 @@ def build_segmented_results(
         ref_nc, ref_tvp = derive_reference_paths_from_tvp(tvp)
         key = ref_nc
         if key not in cache:
-            cache[key] = compute_reference_baselines(ref_nc, ref_tvp, resample_freq=resample_freq)
+            cache[key] = compute_reference_baselines(
+                ref_nc, ref_tvp, resample_freq=resample_freq
+            )
         soc_ref_proxy = cache[key]["soc_ref_proxy"]
         energy_caps_ref = cache[key]["energy_caps_ref"]
 
         # Build test proxy hourly + optional resample AFTER proxy
-        df_test = _load_timeseries_clustered(path_cluster_map(mid), path_timeseries(mid))
+        df_test = _load_timeseries_clustered(
+            path_cluster_map(mid), path_timeseries(mid)
+        )
         soc_test_proxy = _build_proxy(df_test, DEMAND_FIELD, SOC_PROXY_PARAMS)
         soc_test_proxy = _maybe_resample(soc_test_proxy, resample_freq)
 
@@ -513,7 +583,11 @@ def build_segmented_results(
         df_m["model_id"] = mid
         if normalize_segment_rmse:
             mean_rmse = df_m["rmse"].mean()
-            df_m["rmse_norm"] = df_m["rmse"] / mean_rmse if mean_rmse and not np.isnan(mean_rmse) else np.nan
+            df_m["rmse_norm"] = (
+                df_m["rmse"] / mean_rmse
+                if mean_rmse and not np.isnan(mean_rmse)
+                else np.nan
+            )
         else:
             df_m["rmse_norm"] = np.nan
 
@@ -522,13 +596,26 @@ def build_segmented_results(
         df_m["ldes_error"] = float(ldes_err)
 
         ts = df_m["month"].dt.to_timestamp(how="start")
-        df_m["month_midpoint_ts"] = ts + pd.to_datetime("15D") - pd.Timestamp(0)  # or pd.to_timedelta(15, "D")
+        df_m["month_midpoint_ts"] = (
+            ts + pd.to_datetime("15D") - pd.Timestamp(0)
+        )  # or pd.to_timedelta(15, "D")
 
         all_rows.append(df_m)
 
     if not all_rows:
-        return pd.DataFrame(columns=["model_id","month","rmse","rmse_norm","pearson_r_m","ldes_error","month_midpoint_ts"])
+        return pd.DataFrame(
+            columns=[
+                "model_id",
+                "month",
+                "rmse",
+                "rmse_norm",
+                "pearson_r_m",
+                "ldes_error",
+                "month_midpoint_ts",
+            ]
+        )
     return pd.concat(all_rows, ignore_index=True)
+
 
 def plot_monthly_rmse_with_ref_proxy(
     df_seg: pd.DataFrame,
@@ -537,7 +624,10 @@ def plot_monthly_rmse_with_ref_proxy(
     savepath: str | None = None,
     cmap: str = "plasma",
     show_proxy_strip: bool = True,
-    height_ratios: tuple[int, int] = (4, 1),  # main : strip → strip is ~4x smaller than main
+    height_ratios: tuple[int, int] = (
+        4,
+        1,
+    ),  # main : strip → strip is ~4x smaller than main
     use_normalized: bool = NORMALIZE_SEGMENT_RMSE,
 ):
     """
@@ -552,8 +642,11 @@ def plot_monthly_rmse_with_ref_proxy(
 
     if show_proxy_strip:
         fig, (ax_main, ax_strip) = plt.subplots(
-            2, 1, sharex=True, figsize=(12, 6),
-            gridspec_kw={"height_ratios": list(height_ratios), "hspace": 0.05}
+            2,
+            1,
+            sharex=True,
+            figsize=(12, 6),
+            gridspec_kw={"height_ratios": list(height_ratios), "hspace": 0.05},
         )
     else:
         fig, ax_main = plt.subplots(figsize=(12, 5))
@@ -566,9 +659,21 @@ def plot_monthly_rmse_with_ref_proxy(
 
     # Main panel: RMSE scatter (left axis)
     norm = Normalize(vmin=np.nanmin(c), vmax=np.nanmax(c))
-    sc = ax_main.scatter(x, y, c=c, cmap=cmap, norm=norm, alpha=0.9, edgecolors="none", s=24, label="Monthly RMSE")
+    sc = ax_main.scatter(
+        x,
+        y,
+        c=c,
+        cmap=cmap,
+        norm=norm,
+        alpha=0.9,
+        edgecolors="none",
+        s=24,
+        label="Monthly RMSE",
+    )
 
-    ax_main.set_ylabel("Monthly RMSE" + (" (normalized)" if y_col == "rmse_norm" else ""))
+    ax_main.set_ylabel(
+        "Monthly RMSE" + (" (normalized)" if y_col == "rmse_norm" else "")
+    )
     ax_main.xaxis.set_major_locator(mdates.YearLocator())
     ax_main.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     ax_main.xaxis.set_minor_locator(mdates.MonthLocator(bymonth=(1, 7)))
@@ -596,6 +701,7 @@ def plot_monthly_rmse_with_ref_proxy(
         plt.savefig(savepath, bbox_inches="tight")
     plt.show()
 
+
 # ==============================
 # (C) Month-importance across models
 # ==============================
@@ -611,9 +717,13 @@ def month_importance_by_corr(
       ['month','corr_rmse','corr_r','n_models','month_midpoint_ts']
     """
     if df_seg.empty:
-        return pd.DataFrame(columns=["month", "corr_rmse", "corr_r", "n_models", "month_midpoint_ts"])
+        return pd.DataFrame(
+            columns=["month", "corr_rmse", "corr_r", "n_models", "month_midpoint_ts"]
+        )
 
-    y_rmse_col = "rmse_norm" if use_normalized and "rmse_norm" in df_seg.columns else "rmse"
+    y_rmse_col = (
+        "rmse_norm" if use_normalized and "rmse_norm" in df_seg.columns else "rmse"
+    )
     y_r_col = "pearson_r_m"  # from segmented_metrics_by_month
 
     def _safe_corr(a: pd.Series, b: pd.Series) -> float:
@@ -630,16 +740,19 @@ def month_importance_by_corr(
         corr_rmse = _safe_corr(g[y_rmse_col], g["ldes_error"])
         # corr of monthly Pearson r vs LDES error
         corr_r = _safe_corr(g[y_r_col], g["ldes_error"])
-        return pd.Series({
-            "corr_rmse": corr_rmse,
-            "corr_r": corr_r,
-            "n_models": g["model_id"].nunique(),
-        })
+        return pd.Series(
+            {
+                "corr_rmse": corr_rmse,
+                "corr_r": corr_r,
+                "n_models": g["model_id"].nunique(),
+            }
+        )
 
     grouped = df_seg.groupby("month").apply(_agg).reset_index()
     ts = grouped["month"].dt.to_timestamp(how="start")
     grouped["month_midpoint_ts"] = ts + pd.to_timedelta(15, unit="D")
     return grouped
+
 
 def plot_month_importance_bar_with_strip(
     df_imp: pd.DataFrame,
@@ -663,8 +776,11 @@ def plot_month_importance_bar_with_strip(
     # Figure & axes
     if show_proxy_strip:
         fig, (ax, ax_strip) = plt.subplots(
-            2, 1, sharex=True, figsize=(12, 6),
-            gridspec_kw={"height_ratios": list(height_ratios), "hspace": 0.05}
+            2,
+            1,
+            sharex=True,
+            figsize=(12, 6),
+            gridspec_kw={"height_ratios": list(height_ratios), "hspace": 0.05},
         )
     else:
         fig, ax = plt.subplots(figsize=(12, 4))
@@ -679,11 +795,11 @@ def plot_month_importance_bar_with_strip(
     neg1 = ~pos1
     c1 = colors[0]
 
-    cont_pos1 = ax.stem(x[pos1], y1[pos1], linefmt='-', markerfmt='o', basefmt=' ')
+    cont_pos1 = ax.stem(x[pos1], y1[pos1], linefmt="-", markerfmt="o", basefmt=" ")
     plt.setp(cont_pos1.stemlines, color=c1, linewidth=1.8)
     plt.setp(cont_pos1.markerline, markerfacecolor=c1, markeredgecolor="white")
 
-    cont_neg1 = ax.stem(x[neg1], y1[neg1], linefmt='-', markerfmt='o', basefmt=' ')
+    cont_neg1 = ax.stem(x[neg1], y1[neg1], linefmt="-", markerfmt="o", basefmt=" ")
     plt.setp(cont_neg1.stemlines, color=c1, linewidth=1.0, alpha=0.5)
     plt.setp(cont_neg1.markerline, markerfacecolor=c1, markeredgecolor="white", alpha=1)
 
@@ -716,10 +832,20 @@ def plot_month_importance_bar_with_strip(
 
     ax.legend(
         handles=[
-            plt.Line2D([0], [0], color=c1, marker='o', linestyle='-', label='corr(RMSE, LDES err)'),
+            plt.Line2D(
+                [0],
+                [0],
+                color=c1,
+                marker="o",
+                linestyle="-",
+                label="corr(RMSE, LDES err)",
+            ),
             # plt.Line2D([0], [0], color=c2, marker='s', linestyle='-', label='corr(Pearson r, LDES err)'),
         ],
-        loc="lower center", bbox_to_anchor=(0.5, 1), ncol=2, frameon=False
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1),
+        ncol=2,
+        frameon=False,
     )
 
     # Proxy strip
@@ -738,6 +864,7 @@ def plot_month_importance_bar_with_strip(
         plt.savefig(savepath, bbox_inches="tight")
     plt.show()
 
+
 # ------------------------------
 # Runner
 # ------------------------------
@@ -746,8 +873,10 @@ if __name__ == "__main__":
 
     # 1) Discover model ids from cluster_maps
     ids_all: List[str] = []
-    for (dirpath, dirnames, filenames) in walk("SoC_proxy_TSA/data/cluster_maps"):
-        ids_all.extend(fn.removesuffix(".csv") for fn in filenames if fn.endswith(".csv"))
+    for dirpath, dirnames, filenames in walk("SoC_proxy_TSA/data/cluster_maps"):
+        ids_all.extend(
+            fn.removesuffix(".csv") for fn in filenames if fn.endswith(".csv")
+        )
         break
 
     # 2) Filter to 10-year models
@@ -780,11 +909,13 @@ if __name__ == "__main__":
         df_seg,
         # pass *any* reference for the strip; pick the standard one or the most common
         proxy_ref=compute_reference_baselines(
-            *derive_reference_paths_from_tvp("SoC_proxy_TSA/data/timeseries/time_varying_parameters.csv"),
-            resample_freq=RESAMPLE_FREQ
+            *derive_reference_paths_from_tvp(
+                "SoC_proxy_TSA/data/timeseries/time_varying_parameters.csv"
+            ),
+            resample_freq=RESAMPLE_FREQ,
         )["soc_ref_proxy"],
         title="Monthly RMSE vs Reference SoC Proxy (colour = LDES capacity error)"
-              + (" [normalized]" if NORMALIZE_SEGMENT_RMSE else ""),
+        + (" [normalized]" if NORMALIZE_SEGMENT_RMSE else ""),
         savepath="monthly_rmse_vs_ref_proxy_coloured.pdf",
         use_normalized=NORMALIZE_SEGMENT_RMSE,
     )
@@ -794,10 +925,11 @@ if __name__ == "__main__":
     plot_month_importance_bar_with_strip(
         df_imp,
         proxy_ref=compute_reference_baselines(
-            *derive_reference_paths_from_tvp("SoC_proxy_TSA/data/timeseries/time_varying_parameters.csv"),
-            resample_freq=RESAMPLE_FREQ
+            *derive_reference_paths_from_tvp(
+                "SoC_proxy_TSA/data/timeseries/time_varying_parameters.csv"
+            ),
+            resample_freq=RESAMPLE_FREQ,
         )["soc_ref_proxy"],
         title="Month importance across models (corr with LDES error): RMSE & Pearson r",
         savepath="month_importance_corr_with_strip.pdf",
     )
-

@@ -20,7 +20,10 @@ import matplotlib.pyplot as plt
 # Utilities
 # =========================
 
-def _normalize_series(s: pd.Series, mode: str = "minmax") -> Tuple[pd.Series, Dict[str, float]]:
+
+def _normalize_series(
+    s: pd.Series, mode: str = "minmax"
+) -> Tuple[pd.Series, Dict[str, float]]:
     """
     Normalize a pandas Series according to the chosen mode.
 
@@ -135,10 +138,10 @@ def _local_extrema_with_prominence(
 
     vals = s.values.astype(float)
     absolute_peak = vals.max()
-    absolute_trough =  vals.min()
+    absolute_trough = vals.min()
     starting_soc = vals[0]
     span = float(absolute_peak - absolute_trough)
-    
+
     prom_thresh = min_prominence * (span if span > 0 else 1.0)
 
     peaks, troughs = [], []
@@ -152,33 +155,45 @@ def _local_extrema_with_prominence(
         # Peak test
         if v >= local.max() and v > vals[i - 1] and v > vals[i + 1]:
             left_min = vals[l:i].min() if i > l else vals[i]
-            right_min = vals[i + 1:r].min() if i + 1 < r else vals[i]
+            right_min = vals[i + 1 : r].min() if i + 1 < r else vals[i]
             prom = v - max(left_min, right_min)
             if prom >= prom_thresh:
                 peaks.append(i)
                 peak_vals.append(v)
-            if v in peak_vals and i not in peaks: #adds any double maxima
+            if v in peak_vals and i not in peaks:  # adds any double maxima
                 peaks.append(i)
                 peak_vals.append(v)
 
         # Trough test
         if v <= local.min() and v < vals[i - 1] and v < vals[i + 1]:
             left_max = vals[l:i].max() if i > l else vals[i]
-            right_max = vals[i + 1:r].max() if i + 1 < r else vals[i]
+            right_max = vals[i + 1 : r].max() if i + 1 < r else vals[i]
             prom = min(left_max, right_max) - v
             if prom >= prom_thresh:
                 troughs.append(i)
                 trough_vals.append(v)
 
-    return np.array(peaks, dtype=int), np.array(troughs, dtype=int), np.array(peak_vals), np.array(trough_vals)
+    return (
+        np.array(peaks, dtype=int),
+        np.array(troughs, dtype=int),
+        np.array(peak_vals),
+        np.array(trough_vals),
+    )
 
 
 # =========================
 # Weight components
 # =========================
 
-def _w_extremum_proximity_scaled(index: pd.Index, peaks: np.ndarray, troughs: np.ndarray,
-                                 p_scale: np.ndarray, q_scale: np.ndarray, tau: float) -> np.ndarray:
+
+def _w_extremum_proximity_scaled(
+    index: pd.Index,
+    peaks: np.ndarray,
+    troughs: np.ndarray,
+    p_scale: np.ndarray,
+    q_scale: np.ndarray,
+    tau: float,
+) -> np.ndarray:
     """Like _w_extremum_proximity but each center is scaled by its relative prominence (0..1)."""
     n = len(index)
     t = np.arange(n)
@@ -191,8 +206,13 @@ def _w_extremum_proximity_scaled(index: pd.Index, peaks: np.ndarray, troughs: np
     return w
 
 
-def _relative_prominence_weights(s_smooth: pd.Series, peaks: np.ndarray, troughs: np.ndarray,
-                                 window: int, min_prominence: float) -> Tuple[np.ndarray, np.ndarray]:
+def _relative_prominence_weights(
+    s_smooth: pd.Series,
+    peaks: np.ndarray,
+    troughs: np.ndarray,
+    window: int,
+    min_prominence: float,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute relative prominence (0..1) for each detected peak/trough using the same heuristic
     used in _local_extrema_with_prominence. The most prominent extreme gets weight 1.
@@ -212,16 +232,24 @@ def _relative_prominence_weights(s_smooth: pd.Series, peaks: np.ndarray, troughs
         r = min(n, i + half + 1)
         v = vals[i]
         if is_peak:
-            left_min  = vals[l:i].min() if i > l else v
-            right_min = vals[i+1:r].min() if i+1 < r else v
+            left_min = vals[l:i].min() if i > l else v
+            right_min = vals[i + 1 : r].min() if i + 1 < r else v
             return v - max(left_min, right_min)
         else:
-            left_max  = vals[l:i].max() if i > l else v
-            right_max = vals[i+1:r].max() if i+1 < r else v
+            left_max = vals[l:i].max() if i > l else v
+            right_max = vals[i + 1 : r].max() if i + 1 < r else v
             return min(left_max, right_max) - v
 
-    p_prom = np.array([max(0.0, prom_at(i, True))  for i in peaks])   if len(peaks)   else np.array([])
-    q_prom = np.array([max(0.0, prom_at(i, False)) for i in troughs]) if len(troughs) else np.array([])
+    p_prom = (
+        np.array([max(0.0, prom_at(i, True)) for i in peaks])
+        if len(peaks)
+        else np.array([])
+    )
+    q_prom = (
+        np.array([max(0.0, prom_at(i, False)) for i in troughs])
+        if len(troughs)
+        else np.array([])
+    )
 
     # Normalize to 0..1 (most prominent = 1)
     if p_prom.size:
@@ -231,7 +259,9 @@ def _relative_prominence_weights(s_smooth: pd.Series, peaks: np.ndarray, troughs
     return p_prom, q_prom
 
 
-def _w_rarity_state_space(s: pd.Series, bins: int = 20, eps: float = 1e-6) -> np.ndarray:
+def _w_rarity_state_space(
+    s: pd.Series, bins: int = 20, eps: float = 1e-6
+) -> np.ndarray:
     """
     Inverse-density weight over SoC state space using a histogram proxy.
 
@@ -282,7 +312,7 @@ def _w_endpoints(
     include_start: bool = True,
     include_end: bool = True,
     weight_start: float = 1.0,
-    weight_end: float = 1.0
+    weight_end: float = 1.0,
 ) -> np.ndarray:
     """
     Endpoint guard weights. Places mass at t=0 and/or t=T.
@@ -315,6 +345,7 @@ def _w_span_distance(s: pd.Series, alpha: float = 1.0) -> np.ndarray:
     dT = np.abs(vals - sT) / span
     return np.power(d0, alpha) + np.power(dT, alpha)
 
+
 def _w_tail_softmax(s_norm: pd.Series, k: float = 8.0, q: float = 0.98) -> np.ndarray:
     """
     Emphasize upper and lower tails with an exponential softmax around high/low quantiles.
@@ -325,9 +356,10 @@ def _w_tail_softmax(s_norm: pd.Series, k: float = 8.0, q: float = 0.98) -> np.nd
     x = s_norm.values.astype(float)
     hi = np.quantile(x, q)
     lo = np.quantile(x, 1.0 - q)
-    up = np.exp(k * (x - hi))        # lights up near top tail
-    dn = np.exp(k * (lo - x))        # lights up near bottom tail
+    up = np.exp(k * (x - hi))  # lights up near top tail
+    dn = np.exp(k * (lo - x))  # lights up near bottom tail
     return up + dn
+
 
 def _w_global_extreme_plateau(
     s: pd.Series,
@@ -411,14 +443,13 @@ def _w_global_extreme_plateau(
     return w
 
 
-
 # =========================
 # Public API
 # =========================
 
+
 def generate_endogenous_biases(
-    df_reference,
-    params: Optional[Dict] = None
+    df_reference, params: Optional[Dict] = None
 ) -> np.ndarray:
     """
     Generate endogenous TSA weighting biases based on a reference SoC proxy signal.
@@ -489,7 +520,7 @@ def generate_endogenous_biases(
     # Defaults
     dflt = dict(
         normalize_mode="minmax",
-        smooth_window=1,       # ~weekly if hourly data
+        smooth_window=1,  # ~weekly if hourly data
         extrema_window=91,
         min_prominence=0.05,
         tau_decay=30,
@@ -498,12 +529,11 @@ def generate_endogenous_biases(
         include_start_end=True,
         endpoint_weight_start=1.0,
         endpoint_weight_end=1.0,
-        tau_global_extreme = 7.0,
-        tail_k = 8.0,
-        tail_q = 0.98,
-        priority_floor_multiplier = 1.25,
-        gep_window=0.01*len(df_reference),
-        
+        tau_global_extreme=7.0,
+        tail_k=8.0,
+        tail_q=0.98,
+        priority_floor_multiplier=1.25,
+        gep_window=0.01 * len(df_reference),
         # toggles
         weight_extremes=True,
         weight_rarity=False,
@@ -511,18 +541,18 @@ def generate_endogenous_biases(
         weight_ramp=True,
         weight_endpoints=True,
         weight_span=True,
-        weight_global_extreme_boost = True,
-        weight_tail_softmax = True,
+        weight_global_extreme_boost=True,
+        weight_tail_softmax=True,
         weight_global_extreme_halo=True,
         # coefficients
         coef_extremes=1.0,
-        coef_rarity=0.0, #this one is weird, don't use
+        coef_rarity=0.0,  # this one is weird, don't use
         coef_curvature=0.25,
         coef_ramp=1,
         coef_endpoints=2.0,
         coef_span=0.5,
-        coef_global_extreme = 1.0,    
-        coef_global_extreme_halo=2.0,    
+        coef_global_extreme=1.0,
+        coef_global_extreme_halo=2.0,
         # plotting
         plot=False,
         plot_scale=1,
@@ -541,25 +571,28 @@ def generate_endogenous_biases(
     s_norm, _ = _normalize_series(s, mode=cfg["normalize_mode"])
     s_smooth = _smooth_series(s_norm, window=int(cfg["smooth_window"]))
 
-    print('[TSA] Generating Endogenous Biases')
+    print("[TSA] Generating Endogenous Biases")
 
     # Differences for curvature and ramp
     ds, d2s = _finite_differences(s_smooth)
 
     # Local extrema (prominent)
     peaks, troughs, _, _ = _local_extrema_with_prominence(
-        s_smooth, window=int(cfg["extrema_window"]), min_prominence=float(cfg["min_prominence"])
+        s_smooth,
+        window=int(cfg["extrema_window"]),
+        min_prominence=float(cfg["min_prominence"]),
     )
 
     add_manual_peaks = 246
-    peaks = np.sort(np.append(peaks,add_manual_peaks))
-    
+    peaks = np.sort(np.append(peaks, add_manual_peaks))
 
-    p_scale, q_scale = _relative_prominence_weights(s_smooth, peaks, troughs,
-                                                window=int(cfg["extrema_window"]),
-                                                min_prominence=float(cfg["min_prominence"]))
-    
-
+    p_scale, q_scale = _relative_prominence_weights(
+        s_smooth,
+        peaks,
+        troughs,
+        window=int(cfg["extrema_window"]),
+        min_prominence=float(cfg["min_prominence"]),
+    )
 
     n = len(s)
     accum = np.zeros(n, dtype=float)
@@ -579,11 +612,15 @@ def generate_endogenous_biases(
 
     # 3. Tail softmax (distributional)
     if cfg.get("weight_tail_softmax", True):
-        w_tail = _w_tail_softmax(s_norm, k=float(cfg.get("tail_k", 8.0)), q=float(cfg.get("tail_q", 0.98)))
+        w_tail = _w_tail_softmax(
+            s_norm, k=float(cfg.get("tail_k", 8.0)), q=float(cfg.get("tail_q", 0.98))
+        )
         accum += cfg.get("coef_tail_softmax", 1.0) * w_tail
 
     if cfg["weight_extremes"]:
-        w_ext = _w_extremum_proximity_scaled(s.index, peaks, troughs, p_scale, q_scale, tau=float(cfg["tau_decay"]))
+        w_ext = _w_extremum_proximity_scaled(
+            s.index, peaks, troughs, p_scale, q_scale, tau=float(cfg["tau_decay"])
+        )
         accum += cfg["coef_extremes"] * w_ext
 
     if cfg["weight_rarity"]:
@@ -630,7 +667,7 @@ def generate_endogenous_biases(
         if bmax <= bmin + 1e-12:
             return np.ones(len(b), dtype=float) * hi
         return lo + (b - bmin) * (hi - lo) / (bmax - bmin)
-    
+
     weights = _rescale_biases(weights, 0.0, 1)
 
     # Optional plot
@@ -642,11 +679,11 @@ def generate_endogenous_biases(
         w_vis = (weights / max(weights.max(), 1e-12)) * (cfg["plot_scale"])
         baseline = float(s_plot.min())
         s_smooth = s_smooth / s_smooth.max()
-        
+
         plt.figure(figsize=(10, 4))
-        plt.plot(s_plot.index, s_plot.values, label="SoC proxy", color='black')
-        plt.plot(s_smooth.index, s_smooth.values,label='Smoothed Signal', color='blue')
-        plt.scatter(s_plot.index, w_vis, s=6, label="Relative weights", color='red')
+        plt.plot(s_plot.index, s_plot.values, label="SoC proxy", color="black")
+        plt.plot(s_smooth.index, s_smooth.values, label="Smoothed Signal", color="blue")
+        plt.scatter(s_plot.index, w_vis, s=6, label="Relative weights", color="red")
         plt.title("Reference proxy with relative endogenous weights")
         plt.xlabel("Time")
         plt.ylabel("Proxy / Relative weight (scaled)")

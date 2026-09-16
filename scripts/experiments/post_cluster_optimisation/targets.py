@@ -5,7 +5,10 @@ from typing import Dict, TYPE_CHECKING, List
 import pandas as pd
 import numpy as np
 
-from soc_proxy.calliope.timeseries import calliope_ts_to_pandas, extrapolate_ts_from_cluster_map
+from soc_proxy.calliope.timeseries import (
+    calliope_ts_to_pandas,
+    extrapolate_ts_from_cluster_map,
+)
 from soc_proxy import generate_soc_proxy
 
 if TYPE_CHECKING:
@@ -22,16 +25,17 @@ class TargetRegistry:
         # Test-model data (clustered models get extrapolated back to full horizon)
         if self.model.tsa.type == "cluster":
             df, _ = extrapolate_ts_from_cluster_map(
-                self.model.paths["cluster_map"],
-                self.model.paths["timeseries"]
+                self.model.paths["cluster_map"], self.model.paths["timeseries"]
             )
         else:
             dr = self.model.calliope_model.params.get("date_range", None)
             low = f"{dr[0]}-01-01" if dr else None
             high = f"{dr[-1]}-12-31" if dr else None
-            df = calliope_ts_to_pandas(source=self.model.paths["timeseries"],
-                                       date_range_lower_bound=low,
-                                       date_range_upper_bound=high)
+            df = calliope_ts_to_pandas(
+                source=self.model.paths["timeseries"],
+                date_range_lower_bound=low,
+                date_range_upper_bound=high,
+            )
         df = df.set_index("timesteps").sort_index()
         df.columns.name = None
         return df
@@ -95,32 +99,43 @@ class TargetRegistry:
                 rows.append(seg.to_numpy())
                 days.append(day.normalize())
         cols = [f"{name}_h{h:02d}" for h in range(H)]
-        return pd.DataFrame(rows, index=pd.DatetimeIndex(days, name="timesteps"), columns=cols)
+        return pd.DataFrame(
+            rows, index=pd.DatetimeIndex(days, name="timesteps"), columns=cols
+        )
 
-    def daily_profile_stacked(self, names: List[str], hours_per_period: int = 24) -> pd.DataFrame:
-        parts = [self.daily_profile(nm, hours_per_period=hours_per_period) for nm in names]
+    def daily_profile_stacked(
+        self, names: List[str], hours_per_period: int = 24
+    ) -> pd.DataFrame:
+        parts = [
+            self.daily_profile(nm, hours_per_period=hours_per_period) for nm in names
+        ]
         return pd.concat(parts, axis=1).sort_index()
 
 
 @dataclass
 class ReferenceTargetRegistry(TargetRegistry):
     """Loads targets from the *reference* (original) timeseries by default."""
+
     ref_cfg: Dict = field(default_factory=dict)
 
     def _hourly_timeseries(self) -> pd.DataFrame:
         # Default to original (pre-cluster) data saved in the model
-        src = (self.ref_cfg or {}).get("path_timeseries") \
-              or self.model.paths.get("original_timeseries") \
-              or self.model.paths["timeseries"]
+        src = (
+            (self.ref_cfg or {}).get("path_timeseries")
+            or self.model.paths.get("original_timeseries")
+            or self.model.paths["timeseries"]
+        )
 
         # date range: default to the model's date_range
-        dr = (self.ref_cfg or {}).get("date_range", self.model.calliope_model.params.get("date_range", None))
+        dr = (self.ref_cfg or {}).get(
+            "date_range", self.model.calliope_model.params.get("date_range", None)
+        )
         low = f"{dr[0]}-01-01" if dr else None
         high = f"{dr[-1]}-12-31" if dr else None
 
-        df = calliope_ts_to_pandas(source=src,
-                                   date_range_lower_bound=low,
-                                   date_range_upper_bound=high)
+        df = calliope_ts_to_pandas(
+            source=src, date_range_lower_bound=low, date_range_upper_bound=high
+        )
         df = df.set_index("timesteps").sort_index()
         df.columns.name = None
         return df
@@ -145,7 +160,9 @@ class ReferenceTargetRegistry(TargetRegistry):
             s = df_proxy["soc_proxy_LDES"]
         else:
             if name not in df.columns:
-                raise KeyError(f"Reference target '{name}' not found in original timeseries.")
+                raise KeyError(
+                    f"Reference target '{name}' not found in original timeseries."
+                )
             s = df[name]
         self.cache[name] = s
         return s

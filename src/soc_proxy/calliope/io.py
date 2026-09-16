@@ -1,14 +1,14 @@
 import calliope
 from pathlib import Path
 from netCDF4 import Dataset
-import  yaml
+import yaml
 
 
 def read_clustered_netcdf(path):
 
     p = Path(path).resolve()
     if not p.is_file():
-        raise Exception('File does not exist at: {path}')
+        raise Exception("File does not exist at: {path}")
     with Dataset(p, "a") as nc:  # append mode
         g = nc.groups["attrs"]
         cfg = yaml.safe_load(g.getncattr("config"))
@@ -16,6 +16,7 @@ def read_clustered_netcdf(path):
         g.setncattr("config", yaml.safe_dump(cfg))
 
     return calliope.read_netcdf(path)
+
 
 def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
     """
@@ -31,7 +32,6 @@ def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
     import pandas as pd
     import xarray as xr
     import inspect
-
 
     # --- 1) Locate the inputs dataset (robustly) ------------------------------
     ds = None
@@ -50,7 +50,9 @@ def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
         try:
             ds = getattr(m.calliope_model.model, "_model_data", None)
             if ds is not None:
-                owners.append(("calliope_model.model", m.calliope_model.model, "_model_data"))
+                owners.append(
+                    ("calliope_model.model", m.calliope_model.model, "_model_data")
+                )
         except Exception:
             pass
 
@@ -75,7 +77,9 @@ def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
     required = ["timestep_cluster", "lookup_datestep_cluster"]
     for r in required:
         if r not in ds:
-            raise RuntimeError(f"Inputs is missing required variable '{r}'. Found vars: {list(ds.data_vars)}")
+            raise RuntimeError(
+                f"Inputs is missing required variable '{r}'. Found vars: {list(ds.data_vars)}"
+            )
     if "clusters" not in ds.coords:
         raise RuntimeError("Inputs is missing 'clusters' coordinate.")
 
@@ -102,12 +106,14 @@ def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
             # strings / objects: cast to same dtype
             return arr.astype(target_dtype, copy=False)
 
-    tc_norm  = _to_target_dtype(tc_clean, coord_dtype)
+    tc_norm = _to_target_dtype(tc_clean, coord_dtype)
     ldc_norm = _to_target_dtype(ldc_clean, coord_dtype)
     have_norm = _to_target_dtype(have, coord_dtype)
 
     # Unified, sorted unique labels
-    unified = pd.Index(pd.unique(pd.Series(np.concatenate([have_norm, tc_norm, ldc_norm])))).sort_values()
+    unified = pd.Index(
+        pd.unique(pd.Series(np.concatenate([have_norm, tc_norm, ldc_norm])))
+    ).sort_values()
     unified = unified.to_numpy()
 
     # If nothing to change, exit early
@@ -144,7 +150,9 @@ def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
         # Missing labels report
         missing = sorted(set(np.unique(ds2[varname].values)) - set(unified.tolist()))
         if missing:
-            print(f"[hotfix][WARN] Mapping '{varname}' still contains labels not in 'clusters': {missing[:10]}")
+            print(
+                f"[hotfix][WARN] Mapping '{varname}' still contains labels not in 'clusters': {missing[:10]}"
+            )
 
     _check_mapping("timestep_cluster")
     _check_mapping("lookup_datestep_cluster")
@@ -170,11 +178,16 @@ def hotfix_unify_clusters_universe(m) -> "xr.Dataset":
         except Exception:
             return list(a)[:n]
 
-    print("[hotfix] clusters coord dtype:", ds2.coords["clusters"].values.dtype,
-          "size:", ds2.dims.get("clusters"))
+    print(
+        "[hotfix] clusters coord dtype:",
+        ds2.coords["clusters"].values.dtype,
+        "size:",
+        ds2.dims.get("clusters"),
+    )
     print("[hotfix] clusters head:", _head(ds2.coords["clusters"].values))
 
     return ds2
+
 
 def hotfix_normalize_timestep_selectors(m):
     """
@@ -214,8 +227,8 @@ def hotfix_normalize_timestep_selectors(m):
         "cluster_first_timestep",
         "lookup_cluster_last_timestep",
         "lookup_datestep_last_cluster_timestep",
-        "final_step",            # in case your pipeline names it directly
-        "previous_step",         # ditto
+        "final_step",  # in case your pipeline names it directly
+        "previous_step",  # ditto
     ]
     candidates = [v for v in candidates if v in ds.data_vars]
 
@@ -240,7 +253,10 @@ def hotfix_normalize_timestep_selectors(m):
         # Case C: float positions that are actually integers (e.g., 11.0)
         if np.issubdtype(vals.dtype, np.floating):
             as_int = vals.astype("int64")
-            if np.allclose(vals, as_int, equal_nan=False) and ((as_int >= 0) & (as_int < t_len)).all():
+            if (
+                np.allclose(vals, as_int, equal_nan=False)
+                and ((as_int >= 0) & (as_int < t_len)).all()
+            ):
                 return tcoord[as_int]
 
         # Case D: strings that match exactly the coord after coercion
@@ -268,7 +284,9 @@ def hotfix_normalize_timestep_selectors(m):
         have = tcoord
         missing = [x for x in np.unique(want).tolist() if x not in have.tolist()]
         if missing:
-            print(f"[hotfix] WARNING: '{name}' still has labels not in 'timesteps' coord (showing up to 10): {missing[:10]}")
+            print(
+                f"[hotfix] WARNING: '{name}' still has labels not in 'timesteps' coord (showing up to 10): {missing[:10]}"
+            )
 
         # Replace if changed dtype or mapped
         try:
@@ -276,9 +294,10 @@ def hotfix_normalize_timestep_selectors(m):
             # Align dtype exactly to the timesteps dtype if datetime-like
             if np.issubdtype(t_dtype, np.datetime64) and ds[name].dtype != t_dtype:
                 ds[name] = ds[name].astype(t_dtype)
-            print(f"[hotfix] Normalized '{name}' to timestep labels (dtype {ds[name].dtype}).")
+            print(
+                f"[hotfix] Normalized '{name}' to timestep labels (dtype {ds[name].dtype})."
+            )
         except Exception as ex:
             print(f"[hotfix] Could not normalize '{name}': {ex}")
 
     return ds
-

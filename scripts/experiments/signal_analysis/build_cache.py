@@ -62,8 +62,8 @@ TIMESERIES_DIR = DATA_ROOT / "timeseries"
 PARAMS_DIR = DATA_ROOT / "parameters"
 
 # Inputs
-# DEFAULT_LOG_CSV = DATA_ROOT / "notes" / "log_10Y_NL_BE.csv" 
-DEFAULT_LOG_CSV = DATA_ROOT / "notes" / "log_10Y_NL_BE.csv" 
+# DEFAULT_LOG_CSV = DATA_ROOT / "notes" / "log_10Y_NL_BE.csv"
+DEFAULT_LOG_CSV = DATA_ROOT / "notes" / "log_10Y_NL_BE.csv"
 
 
 # Outputs
@@ -91,7 +91,18 @@ RESAMPLE_FREQ: Optional[str] = None
 # Smoothing is used ONLY to locate peak timing robustly (edge-safe via wrap).
 PEAK_SMOOTH_DAYS: int = 1
 # Half-window sizes (in days) around the reference CEM peak (cyclic wrap).
-PEAK_WINDOW_HALF_DAYS: tuple[int, ...] = (15, 30, 45, 90, 180, int(0.75*365), 365, 548, 730, int(2.5*365))
+PEAK_WINDOW_HALF_DAYS: tuple[int, ...] = (
+    15,
+    30,
+    45,
+    90,
+    180,
+    int(0.75 * 365),
+    365,
+    548,
+    730,
+    int(2.5 * 365),
+)
 
 # Country-specific dispatchable capacity (from your earlier code)
 DISPATCHABLE_BY_COUNTRY = {
@@ -105,9 +116,13 @@ DISPATCHABLE_BY_COUNTRY = {
 # Base proxy params (country-specific known_dispatchable_capacity is filled dynamically)
 SOC_PROXY_PARAMS_BASE: Dict[str, Any] = {
     "capacity_weights": {"solar": 1, "onshore_wind": 0.5, "offshore_wind": 0.5},
-    "storage_process_losses": {"charging_efficiency": 0.65 * 0.99, "discharging_efficiency": 0.56 * 0.99},
+    "storage_process_losses": {
+        "charging_efficiency": 0.65 * 0.99,
+        "discharging_efficiency": 0.56 * 0.99,
+    },
     "soc_decomposition": {"method": "fft_lowpass", "time_horizon_hours": 24},
 }
+
 
 # =============================================================================
 # Small helpers
@@ -139,6 +154,7 @@ def parse_k_and_wp(model_name: str) -> tuple[float | None, float | None]:
 
     return k, wp
 
+
 def parse_dates_window(dates_str: str) -> tuple[str, str, str]:
     """
     dates_str format: "yyyy,yyyy" (e.g., "2010,2019")
@@ -162,10 +178,12 @@ def parse_dates_window(dates_str: str) -> tuple[str, str, str]:
     window_id = f"{y0:04d}_{y1:04d}"
     return start, end, window_id
 
+
 def _maybe_resample(s: pd.Series, freq: Optional[str]) -> pd.Series:
     if freq is None:
         return s
     return s.resample(freq).mean()
+
 
 def _safe_pearson(a: pd.Series, b: pd.Series) -> float:
     a2, b2 = a.align(b, join="inner")
@@ -173,11 +191,13 @@ def _safe_pearson(a: pd.Series, b: pd.Series) -> float:
         return np.nan
     return float(a2.corr(b2))
 
+
 def _rmse(a: pd.Series, b: pd.Series) -> float:
     a2, b2 = a.align(b, join="inner")
     if a2.empty:
         return np.nan
     return float(np.sqrt(np.mean((a2 - b2) ** 2)))
+
 
 def _nrmse_by_range(a: pd.Series, b: pd.Series) -> float:
     """Normalize RMSE by (max(ref)-min(ref)) on aligned range, robust for min-max comparisons."""
@@ -188,6 +208,7 @@ def _nrmse_by_range(a: pd.Series, b: pd.Series) -> float:
     if denom == 0:
         return np.nan
     return float(np.sqrt(np.mean((a2 - b2) ** 2)) / denom)
+
 
 def _minmax_error(a: pd.Series, b: pd.Series) -> float:
     """
@@ -203,6 +224,7 @@ def _minmax_error(a: pd.Series, b: pd.Series) -> float:
     if ref_range == 0:
         return np.nan
     return float((abs(ref_min - tst_min) + abs(ref_max - tst_max)) / ref_range)
+
 
 def _signed_rel_error(ref_val: float, test_val: float) -> float:
     if ref_val == 0 or np.isnan(ref_val) or np.isnan(test_val):
@@ -226,6 +248,7 @@ def safe_pearson_np(x: np.ndarray, y: np.ndarray) -> float:
         return np.nan
     return float(pearsonr(x2, y2)[0])
 
+
 def range_denom(y: np.ndarray) -> float:
     """Range denominator (max-min) with NaN/inf protection."""
     if y.size == 0:
@@ -235,6 +258,7 @@ def range_denom(y: np.ndarray) -> float:
         return np.nan
     yy = y[m]
     return float(np.max(yy) - np.min(yy))
+
 
 def summarise_pair_metrics(
     x: np.ndarray,
@@ -251,11 +275,21 @@ def summarise_pair_metrics(
     If denom is None, uses range(y) on the provided arrays.
     """
     if x.size == 0 or y.size == 0:
-        return {"pearson_r": np.nan, "nrmse_range": np.nan, "nmae_range": np.nan, "nmbe_range": np.nan}
+        return {
+            "pearson_r": np.nan,
+            "nrmse_range": np.nan,
+            "nmae_range": np.nan,
+            "nmbe_range": np.nan,
+        }
 
     m = np.isfinite(x) & np.isfinite(y)
     if m.sum() < 3:
-        return {"pearson_r": np.nan, "nrmse_range": np.nan, "nmae_range": np.nan, "nmbe_range": np.nan}
+        return {
+            "pearson_r": np.nan,
+            "nrmse_range": np.nan,
+            "nmae_range": np.nan,
+            "nmbe_range": np.nan,
+        }
 
     xx = x[m].astype(float, copy=False)
     yy = y[m].astype(float, copy=False)
@@ -265,11 +299,16 @@ def summarise_pair_metrics(
 
     mbe = float(np.mean(diff))
     mae = float(np.mean(np.abs(diff)))
-    rmse = float(np.sqrt(np.mean(diff ** 2)))
+    rmse = float(np.sqrt(np.mean(diff**2)))
 
     d = float(denom) if denom is not None else range_denom(yy)
     if not np.isfinite(d) or d == 0.0:
-        return {"pearson_r": r, "nrmse_range": np.nan, "nmae_range": np.nan, "nmbe_range": np.nan}
+        return {
+            "pearson_r": r,
+            "nrmse_range": np.nan,
+            "nmae_range": np.nan,
+            "nmbe_range": np.nan,
+        }
 
     return {
         "pearson_r": r,
@@ -277,7 +316,6 @@ def summarise_pair_metrics(
         "nmae_range": mae / d,
         "nmbe_range": mbe / d,
     }
-
 
 
 def align_four(
@@ -346,7 +384,6 @@ def build_stepwise_errors_aligned(
     }
 
 
-
 def summarise_signal_full(
     x: np.ndarray,
     y: np.ndarray,
@@ -356,11 +393,12 @@ def summarise_signal_full(
     """Backwards-compatible wrapper returning the standard metric set for x vs y."""
     return summarise_pair_metrics(x, y, denom=denom)
 
+
 def _infer_steps_per_day(index: pd.DatetimeIndex) -> int:
     """Infer steps/day from a regular DateTimeIndex."""
     if len(index) < 2:
         raise ValueError("Need at least 2 timesteps to infer frequency")
-    dt = (index[1] - index[0])
+    dt = index[1] - index[0]
     if dt <= pd.Timedelta(0):
         raise ValueError("Index must be strictly increasing")
     steps = int(round(pd.Timedelta(days=1) / dt))
@@ -449,7 +487,9 @@ def peak_and_windows_diagnostics(
         "peak_dt_days_cem_clu_vs_cem_ref": _cyc_dt_days(i_peak_cem_clu, i_peak_ref),
         "peak_dt_days_proxy_ref_vs_cem_ref": _cyc_dt_days(i_peak_proxy_ref, i_peak_ref),
         "peak_dt_days_proxy_clu_vs_cem_ref": _cyc_dt_days(i_peak_proxy_clu, i_peak_ref),
-        "peak_dt_days_proxy_clu_vs_proxy_ref": _cyc_dt_days(i_peak_proxy_clu, i_peak_proxy_ref),
+        "peak_dt_days_proxy_clu_vs_proxy_ref": _cyc_dt_days(
+            i_peak_proxy_clu, i_peak_proxy_ref
+        ),
     }
 
     # peak magnitudes at each series' own smoothed peak time (using RAW values at that index)
@@ -466,15 +506,22 @@ def peak_and_windows_diagnostics(
     # (This avoids the old "value-at-ref-peak" only view)
     denom_ref = out["peak_val_cem_ref"]
     denom_clu = out["peak_val_cem_clu"]
-    out["peak_mag_err_proxy_ref_vs_cem_ref_abs"] = out["peak_val_proxy_ref"] - out["peak_val_cem_ref"]
-    out["peak_mag_err_proxy_clu_vs_cem_clu_abs"] = out["peak_val_proxy_clu"] - out["peak_val_cem_clu"]
+    out["peak_mag_err_proxy_ref_vs_cem_ref_abs"] = (
+        out["peak_val_proxy_ref"] - out["peak_val_cem_ref"]
+    )
+    out["peak_mag_err_proxy_clu_vs_cem_clu_abs"] = (
+        out["peak_val_proxy_clu"] - out["peak_val_cem_clu"]
+    )
     out["peak_mag_err_proxy_ref_vs_cem_ref_rel"] = (
-        (out["peak_mag_err_proxy_ref_vs_cem_ref_abs"] / denom_ref) if denom_ref not in (0.0, np.nan) else np.nan
+        (out["peak_mag_err_proxy_ref_vs_cem_ref_abs"] / denom_ref)
+        if denom_ref not in (0.0, np.nan)
+        else np.nan
     )
     out["peak_mag_err_proxy_clu_vs_cem_clu_rel"] = (
-        (out["peak_mag_err_proxy_clu_vs_cem_clu_abs"] / denom_clu) if denom_clu not in (0.0, np.nan) else np.nan
+        (out["peak_mag_err_proxy_clu_vs_cem_clu_abs"] / denom_clu)
+        if denom_clu not in (0.0, np.nan)
+        else np.nan
     )
-
 
     # -------------------------------------------------------------------------
     # Windowed diagnostics centred on the REFERENCE PROXY peak (cyclic).
@@ -547,7 +594,6 @@ def peak_and_windows_diagnostics(
         for k, v in s.items():
             out[f"win{half_days}d_proxy_delta_ref_vs_cem_delta_clu_{k}"] = v
 
-
     return out
 
 
@@ -555,18 +601,22 @@ def peak_and_windows_diagnostics(
 # Reference resolution
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class ReferenceKey:
     """
     A stable identifier to connect many clustered models to one reference baseline.
     Keep it string-friendly for caching & joins.
     """
+
     ref_nc: str
     ref_tvp: str
     country: str
     tag: str  # e.g. "standard_2010_2019_reference" or "shuffleXYZ"
+
     def as_id(self) -> str:
         return f"{self.country}__{self.tag}"
+
 
 def _infer_country_from_tvp(tvp: str) -> str:
     """
@@ -587,7 +637,11 @@ def _infer_country_from_tvp(tvp: str) -> str:
 
     # --- Explicit country markers in filename/path ---
     # e.g. time_varying_parameters_BE.csv
-    m = re.search(r"time_varying_parameters[_\-](NL|BE|GB|IT|ES)\.csv\b", fname, flags=re.IGNORECASE)
+    m = re.search(
+        r"time_varying_parameters[_\-](NL|BE|GB|IT|ES)\.csv\b",
+        fname,
+        flags=re.IGNORECASE,
+    )
     if m:
         return m.group(1).upper()
 
@@ -654,7 +708,9 @@ def derive_reference_from_tvp(tvp_path: str, window_id: str) -> ReferenceKey:
             )
 
         tag = ref_nc_path.stem
-        return ReferenceKey(ref_nc=str(ref_nc_path), ref_tvp=str(ref_tvp_path), country=country, tag=tag)
+        return ReferenceKey(
+            ref_nc=str(ref_nc_path), ref_tvp=str(ref_tvp_path), country=country, tag=tag
+        )
 
     # -------------------------
     # Standard case (NL-special)
@@ -679,7 +735,8 @@ def derive_reference_from_tvp(tvp_path: str, window_id: str) -> ReferenceKey:
     # TVP: if you keep a single time_varying_parameters.csv, that's fine.
     # Still strict: must exist.
     tvp_candidates = [
-        TIMESERIES_DIR / f"time_varying_parameters_{window_id}.csv",  # if you ever made horizon-specific TVPs
+        TIMESERIES_DIR
+        / f"time_varying_parameters_{window_id}.csv",  # if you ever made horizon-specific TVPs
         TIMESERIES_DIR / "time_varying_parameters.csv",
     ]
     ref_tvp_path = next((p for p in tvp_candidates if p.is_file()), None)
@@ -689,13 +746,15 @@ def derive_reference_from_tvp(tvp_path: str, window_id: str) -> ReferenceKey:
         )
 
     tag = ref_nc_path.stem
-    return ReferenceKey(ref_nc=str(ref_nc_path), ref_tvp=str(ref_tvp_path), country=country, tag=tag)
-
+    return ReferenceKey(
+        ref_nc=str(ref_nc_path), ref_tvp=str(ref_tvp_path), country=country, tag=tag
+    )
 
 
 # =============================================================================
 # Calliope model loading (cluster attr fix)
 # =============================================================================
+
 
 def read_netcdf_with_attr_fix(path: str) -> calliope.Model:
     """
@@ -716,9 +775,11 @@ def read_netcdf_with_attr_fix(path: str) -> calliope.Model:
 
     return calliope.read_netcdf(str(p))
 
+
 # =============================================================================
 # SoC extraction (CEM output)
 # =============================================================================
+
 
 def _soc_from_reference_model(m: calliope.Model) -> pd.Series:
     """
@@ -731,7 +792,7 @@ def _soc_from_reference_model(m: calliope.Model) -> pd.Series:
         .fillna(0)
         .to_series()
         .dropna()
-        .rename("cem_soc")          # <-- key fix: name the values
+        .rename("cem_soc")  # <-- key fix: name the values
         .reset_index()
     )
 
@@ -755,8 +816,12 @@ def _soc_from_clustered_model(m: calliope.Model, cluster_map_csv: str) -> pd.Ser
     cluster_map = pd.read_csv(cluster_map_csv).rename(
         columns={"timesteps": "datesteps", "PeriodNum": "mapped_datesteps"}
     )
-    cluster_map["datesteps"] = pd.to_datetime(cluster_map["datesteps"], format="%Y-%m-%d")
-    cluster_map["mapped_datesteps"] = pd.to_datetime(cluster_map["mapped_datesteps"], format="%Y-%m-%d")
+    cluster_map["datesteps"] = pd.to_datetime(
+        cluster_map["datesteps"], format="%Y-%m-%d"
+    )
+    cluster_map["mapped_datesteps"] = pd.to_datetime(
+        cluster_map["mapped_datesteps"], format="%Y-%m-%d"
+    )
 
     # intra
     df_intra = (
@@ -768,7 +833,9 @@ def _soc_from_clustered_model(m: calliope.Model, cluster_map_csv: str) -> pd.Ser
         .reset_index()
     )
     df_intra = df_intra[df_intra["techs"] == STORAGE_TECH]
-    df_intra["mapped_datesteps"] = pd.to_datetime(df_intra["timesteps"], format="%Y-%m-%d")
+    df_intra["mapped_datesteps"] = pd.to_datetime(
+        df_intra["timesteps"], format="%Y-%m-%d"
+    )
     df_intra["mapped_datesteps"] = df_intra["mapped_datesteps"].dt.normalize()
 
     # inter
@@ -789,26 +856,35 @@ def _soc_from_clustered_model(m: calliope.Model, cluster_map_csv: str) -> pd.Ser
 
     # reconstruct full timestamp: datestep date + hour from timesteps
     time_only = pd.to_datetime(df["timesteps"]).dt.time
-    df["full_timestamp"] = df["datesteps"].dt.normalize() + pd.to_timedelta(time_only.astype(str))
+    df["full_timestamp"] = df["datesteps"].dt.normalize() + pd.to_timedelta(
+        time_only.astype(str)
+    )
     df = df.set_index("full_timestamp").sort_index()
 
     soc = (df["inter_soc"].fillna(0) + df["intra_soc"].fillna(0)).rename("cem_soc")
     soc.index.name = "timesteps"
     return soc
 
+
 def extract_cem_soc(model_id: str) -> pd.Series:
     nc_path = str(MODELS_DIR / f"{model_id}.nc")
     m = read_netcdf_with_attr_fix(nc_path)
 
-    is_clustered = bool(getattr(m.inputs, "clusters", None).any()) if hasattr(m, "inputs") else False
+    is_clustered = (
+        bool(getattr(m.inputs, "clusters", None).any())
+        if hasattr(m, "inputs")
+        else False
+    )
     if is_clustered:
         cm_path = str(CLUSTER_MAPS_DIR / f"{model_id}.csv")
         return _soc_from_clustered_model(m, cm_path)
     return _soc_from_reference_model(m)
 
+
 # =============================================================================
 # SoC Proxy extraction
 # =============================================================================
+
 
 def _soc_proxy_params_for_country(country: str) -> Dict[str, Any]:
     params = dict(SOC_PROXY_PARAMS_BASE)
@@ -816,6 +892,7 @@ def _soc_proxy_params_for_country(country: str) -> Dict[str, Any]:
         "known_dispatchable_capacity": DISPATCHABLE_BY_COUNTRY.get(country, 0)
     }
     return params
+
 
 def _load_reference_tvp(tvp_csv: str, window: tuple[str, str]) -> pd.DataFrame:
     df = calliope_ts_to_pandas(Path(tvp_csv), window[0], window[1])
@@ -837,7 +914,7 @@ def _load_clustered_timeseries_from_ref_tvp(
     df = df.set_index("timesteps").sort_index()
 
     # window after reconstruction (keeps logic simple + matches older behavior)
-    df = df.loc[window[0]:window[1]]
+    df = df.loc[window[0] : window[1]]
     return df
 
 
@@ -859,11 +936,17 @@ def build_soc_proxy(df_ts: pd.DataFrame, country: str) -> pd.Series:
     s = s.sort_index()
     return s
 
-def extract_soc_proxy_reference(ref_key: ReferenceKey, window: tuple[str, str]) -> pd.Series:
+
+def extract_soc_proxy_reference(
+    ref_key: ReferenceKey, window: tuple[str, str]
+) -> pd.Series:
     df_ref = _load_reference_tvp(ref_key.ref_tvp, window)
     return build_soc_proxy(df_ref, country=ref_key.country)
 
-def extract_soc_proxy_clustered(model_id: str, ref_key: ReferenceKey, window: tuple[str, str]) -> pd.Series:
+
+def extract_soc_proxy_clustered(
+    model_id: str, ref_key: ReferenceKey, window: tuple[str, str]
+) -> pd.Series:
     cm_path = str(CLUSTER_MAPS_DIR / f"{model_id}.csv")
     df = _load_clustered_timeseries_from_ref_tvp(cm_path, ref_key.ref_tvp, window)
     return build_soc_proxy(df, country=ref_key.country)
@@ -884,7 +967,12 @@ def compute_signal_metrics(test: pd.Series, ref: pd.Series) -> Dict[str, float]:
     """
     ref_a, test_a = ref.align(test, join="inner")
     if ref_a.empty:
-        return {"pearson_r": np.nan, "nrmse_range": np.nan, "nmae_range": np.nan, "nmbe_range": np.nan}
+        return {
+            "pearson_r": np.nan,
+            "nrmse_range": np.nan,
+            "nmae_range": np.nan,
+            "nmbe_range": np.nan,
+        }
     denom = range_denom(ref_a.to_numpy(dtype=float))
     return summarise_pair_metrics(
         test_a.to_numpy(dtype=float),
@@ -892,14 +980,17 @@ def compute_signal_metrics(test: pd.Series, ref: pd.Series) -> Dict[str, float]:
         denom=denom,
     )
 
+
 def capacity_from_soc(soc: pd.Series) -> float:
     if soc.empty:
         return np.nan
     return float(soc.max())
 
+
 # =============================================================================
 # Cache building
 # =============================================================================
+
 
 @dataclass
 class ReferenceBaseline:
@@ -907,20 +998,24 @@ class ReferenceBaseline:
     soc_proxy_ref: pd.Series
     ldes_cap_ref: float
 
-def build_reference_baseline(ref_key: ReferenceKey, window: tuple[str, str]) -> ReferenceBaseline:
+
+def build_reference_baseline(
+    ref_key: ReferenceKey, window: tuple[str, str]
+) -> ReferenceBaseline:
     """
     Build (and later memoize) all reference-derived baselines once per reference.
     """
     # CEM SoC from the reference netcdf
     # IMPORTANT: reference netcdf id might not equal tag; this assumes ref_nc exists and stores SoC.
     m_ref = read_netcdf_with_attr_fix(ref_key.ref_nc)
-    cem_soc_ref = _soc_from_reference_model(m_ref).loc[window[0]:window[1]]
-    soc_proxy_ref = extract_soc_proxy_reference(ref_key, window).loc[window[0]:window[1]]
+    cem_soc_ref = _soc_from_reference_model(m_ref).loc[window[0] : window[1]]
+    soc_proxy_ref = extract_soc_proxy_reference(ref_key, window).loc[
+        window[0] : window[1]
+    ]
 
     # Keep resampling consistent (if enabled)
     cem_soc_ref = _maybe_resample(cem_soc_ref, RESAMPLE_FREQ)
     soc_proxy_ref = _maybe_resample(soc_proxy_ref, RESAMPLE_FREQ)
-
 
     return ReferenceBaseline(
         cem_soc_ref=cem_soc_ref,
@@ -928,7 +1023,10 @@ def build_reference_baseline(ref_key: ReferenceKey, window: tuple[str, str]) -> 
         ldes_cap_ref=capacity_from_soc(cem_soc_ref),
     )
 
-def save_signals_parquet(model_id: str, ref_id: str, cem_soc: pd.Series, soc_proxy: pd.Series) -> Tuple[str, str]:
+
+def save_signals_parquet(
+    model_id: str, ref_id: str, cem_soc: pd.Series, soc_proxy: pd.Series
+) -> Tuple[str, str]:
     """
     Write two parquet files (cem_soc, soc_proxy). Returns their paths as strings.
     """
@@ -938,6 +1036,7 @@ def save_signals_parquet(model_id: str, ref_id: str, cem_soc: pd.Series, soc_pro
     cem_soc.to_frame("cem_soc").to_parquet(p1)
     soc_proxy.to_frame("soc_proxy").to_parquet(p2)
     return str(p1), str(p2)
+
 
 def build_cache(
     log_csv: Path = DEFAULT_LOG_CSV,
@@ -954,14 +1053,19 @@ def build_cache(
 
     # Minimal expectation: must include 'id' and 'tvp'
     if "id" not in df_log.columns or "tvp" not in df_log.columns:
-        raise ValueError(f"log CSV must contain at least columns ['id','tvp']; got {df_log.columns.tolist()}")
+        raise ValueError(
+            f"log CSV must contain at least columns ['id','tvp']; got {df_log.columns.tolist()}"
+        )
 
     if "dates" not in df_log.columns:
         raise ValueError("log CSV must contain a 'dates' column formatted 'yyyy,yyyy'")
 
-
     # Optionally filter to models that actually have a cluster map
-    df_log = df_log[df_log["id"].astype(str).apply(lambda x: (CLUSTER_MAPS_DIR / f"{x}.csv").is_file())].copy()
+    df_log = df_log[
+        df_log["id"]
+        .astype(str)
+        .apply(lambda x: (CLUSTER_MAPS_DIR / f"{x}.csv").is_file())
+    ].copy()
 
     # Memoize references
     ref_cache: Dict[tuple[str, str], ReferenceBaseline] = {}
@@ -970,8 +1074,7 @@ def build_cache(
     counter = 0
     for _, r in df_log.iterrows():
         counter += 1
-        print(f'Evaluating model: {counter}')
-        
+        print(f"Evaluating model: {counter}")
 
         model_id = str(r["id"])
         tvp = str(r["tvp"])
@@ -985,15 +1088,16 @@ def build_cache(
         ref_stem = Path(ref_key.ref_nc).stem
         if ref_key.country == "NL":
             if re.search(r"_NL$", ref_stem):
-                raise ValueError(f"NL reference unexpectedly has _NL suffix: {ref_key.ref_nc}")
+                raise ValueError(
+                    f"NL reference unexpectedly has _NL suffix: {ref_key.ref_nc}"
+                )
         else:
-            if not re.search(fr"_{ref_key.country}$", ref_stem):
+            if not re.search(rf"_{ref_key.country}$", ref_stem):
                 raise ValueError(
                     f"Non-NL reference is missing expected _{ref_key.country} suffix: {ref_key.ref_nc}"
                 )
 
         ref_id = ref_key.as_id()
-
 
         cache_key = (ref_id, window_id)
         if cache_key not in ref_cache:
@@ -1002,11 +1106,12 @@ def build_cache(
         baseline = ref_cache[cache_key]
 
         # Clustered CEM SoC + proxy (slice to window + resample consistently)
-        cem_soc_clu = extract_cem_soc(model_id).loc[window[0]:window[1]]
-        soc_proxy_clu = extract_soc_proxy_clustered(model_id, ref_key, window).loc[window[0]:window[1]]
+        cem_soc_clu = extract_cem_soc(model_id).loc[window[0] : window[1]]
+        soc_proxy_clu = extract_soc_proxy_clustered(model_id, ref_key, window).loc[
+            window[0] : window[1]
+        ]
         cem_soc_clu = _maybe_resample(cem_soc_clu, RESAMPLE_FREQ)
         soc_proxy_clu = _maybe_resample(soc_proxy_clu, RESAMPLE_FREQ)
-
 
         # Capacities (max SoC from CEM signals)
         ldes_cap_clu = capacity_from_soc(cem_soc_clu)
@@ -1018,7 +1123,6 @@ def build_cache(
             cem_clu=cem_soc_clu,
             proxy_clu=soc_proxy_clu,
         )
-
 
         # ---------------------------------------------------------------------
         # Standardised whole-horizon metrics (fixed denom = full-horizon reference ranges)
@@ -1085,7 +1189,9 @@ def build_cache(
             aligned["cem_clu"].to_numpy(dtype=float),
             denom=denom_cem_clu,
         )
-        d_proxy_ref_s, d_cem_clu_s = aligned["d_proxy_ref"].align(aligned["d_cem_clu"], join="inner")
+        d_proxy_ref_s, d_cem_clu_s = aligned["d_proxy_ref"].align(
+            aligned["d_cem_clu"], join="inner"
+        )
         comp_delta_sum = summarise_signal_full(
             d_proxy_ref_s.to_numpy(dtype=float),
             d_cem_clu_s.to_numpy(dtype=float),
@@ -1102,16 +1208,22 @@ def build_cache(
         )
 
         cap_err_signed = _signed_rel_error(baseline.ldes_cap_ref, ldes_cap_clu)
-        cap_err_abs = float(np.abs(cap_err_signed)) if not np.isnan(cap_err_signed) else np.nan
+        cap_err_abs = (
+            float(np.abs(cap_err_signed)) if not np.isnan(cap_err_signed) else np.nan
+        )
 
         # (1) Proxy Error: reference proxy vs reference CEM SoC
-        metrics_proxy_ref = compute_signal_metrics(test=baseline.soc_proxy_ref, ref=baseline.cem_soc_ref)
+        metrics_proxy_ref = compute_signal_metrics(
+            test=baseline.soc_proxy_ref, ref=baseline.cem_soc_ref
+        )
 
         # (2) Proxy Error: clustered proxy vs clustered CEM SoC
         metrics_proxy_clu = compute_signal_metrics(test=soc_proxy_clu, ref=cem_soc_clu)
 
         # (3) TSA Error: clustered proxy vs reference proxy
-        metrics_tsa = compute_signal_metrics(test=soc_proxy_clu, ref=baseline.soc_proxy_ref)
+        metrics_tsa = compute_signal_metrics(
+            test=soc_proxy_clu, ref=baseline.soc_proxy_ref
+        )
 
         # Optional: store signals for later plotting
         cem_parq, proxy_parq = (None, None)
@@ -1126,106 +1238,115 @@ def build_cache(
         model_name = r.get("model_name", None)
         k_val, wp_val = parse_k_and_wp(model_name)
 
-
-        rows.append({
-            "model_id": model_id,
-            "tvp": tvp,
-            "country": ref_key.country,
-            "reference_id": ref_id,
-            "reference_nc": ref_key.ref_nc,
-            "reference_tvp": ref_key.ref_tvp,
-            "resample_freq": RESAMPLE_FREQ if RESAMPLE_FREQ else "hourly",
-            "dates": str(r["dates"]),
-            "window_id": window_id,
-
-            # log hyperparams (if present)
-            "Wp": wp_val,
-            "k": k_val,
-
-
-            # capacities
-            "ldes_cap_ref_maxsoc": baseline.ldes_cap_ref,
-            "ldes_cap_clu_maxsoc": ldes_cap_clu,
-            "ldes_cap_error_signed": cap_err_signed,
-            "ldes_cap_error_abs": cap_err_abs,
-
-            # proxy error (reference)
-            "proxy_ref_pearson_r": metrics_proxy_ref["pearson_r"],
-            "proxy_ref_nrmse_range": metrics_proxy_ref["nrmse_range"],
-            "proxy_ref_nmae_range": metrics_proxy_ref["nmae_range"],
-            "proxy_ref_nmbe_range": metrics_proxy_ref["nmbe_range"],
-
-            # proxy error (clustered)
-            "proxy_clu_pearson_r": metrics_proxy_clu["pearson_r"],
-            "proxy_clu_nrmse_range": metrics_proxy_clu["nrmse_range"],
-            "proxy_clu_nmae_range": metrics_proxy_clu["nmae_range"],
-            "proxy_clu_nmbe_range": metrics_proxy_clu["nmbe_range"],
-
-            # TSA error (proxy clustered vs proxy reference)
-            "tsa_pearson_r": metrics_tsa["pearson_r"],
-            "tsa_nrmse_range": metrics_tsa["nrmse_range"],
-            "tsa_nmae_range": metrics_tsa["nmae_range"],
-            "tsa_nmbe_range": metrics_tsa["nmbe_range"],
-
-            # signal locations
-            "cem_soc_parquet": cem_parq,
-            "soc_proxy_parquet": proxy_parq,
-
-            # aligned stepwise error summaries
-            "e_proxy_ref_pearson_r": e_proxy_ref_sum["pearson_r"],
-            "e_proxy_ref_nrmse_range": e_proxy_ref_sum["nrmse_range"],
-            "e_proxy_ref_nmae_range": e_proxy_ref_sum["nmae_range"],
-            "e_proxy_ref_nmbe_range": e_proxy_ref_sum["nmbe_range"],
-
-            "e_proxy_clu_pearson_r": e_proxy_clu_sum["pearson_r"],
-            "e_proxy_clu_nrmse_range": e_proxy_clu_sum["nrmse_range"],
-            "e_proxy_clu_nmae_range": e_proxy_clu_sum["nmae_range"],
-            "e_proxy_clu_nmbe_range": e_proxy_clu_sum["nmbe_range"],
-
-            "e_tsa_proxy_pearson_r": e_tsa_proxy_sum["pearson_r"],
-            "e_tsa_proxy_nrmse_range": e_tsa_proxy_sum["nrmse_range"],
-            "e_tsa_proxy_nmae_range": e_tsa_proxy_sum["nmae_range"],
-            "e_tsa_proxy_nmbe_range": e_tsa_proxy_sum["nmbe_range"],
-
-            "e_tsa_cem_pearson_r": e_tsa_cem_sum["pearson_r"],
-            "e_tsa_cem_nrmse_range": e_tsa_cem_sum["nrmse_range"],
-            "e_tsa_cem_nmae_range": e_tsa_cem_sum["nmae_range"],
-            "e_tsa_cem_nmbe_range": e_tsa_cem_sum["nmbe_range"],
-
-            #deltas
-            "e_tsa_proxy_delta_pearson_r": d_tsa_proxy_sum["pearson_r"],
-            "e_tsa_proxy_delta_nrmse_range": d_tsa_proxy_sum["nrmse_range"],
-            "e_tsa_proxy_delta_nmae_range": d_tsa_proxy_sum["nmae_range"],
-            "e_tsa_proxy_delta_nmbe_range": d_tsa_proxy_sum["nmbe_range"],
-            "e_proxy_delta_ref_vs_cem_delta_ref_pearson_r": d_base_ref_sum["pearson_r"],
-            "e_proxy_delta_ref_vs_cem_delta_ref_nrmse_range": d_base_ref_sum["nrmse_range"],
-            "e_proxy_delta_ref_vs_cem_delta_ref_nmae_range": d_base_ref_sum["nmae_range"],
-            "e_proxy_delta_ref_vs_cem_delta_ref_nmbe_range": d_base_ref_sum["nmbe_range"],
-
-            "e_proxy_delta_clu_vs_cem_delta_clu_pearson_r": d_base_clu_sum["pearson_r"],
-            "e_proxy_delta_clu_vs_cem_delta_clu_nrmse_range": d_base_clu_sum["nrmse_range"],
-            "e_proxy_delta_clu_vs_cem_delta_clu_nmae_range": d_base_clu_sum["nmae_range"],
-            "e_proxy_delta_clu_vs_cem_delta_clu_nmbe_range": d_base_clu_sum["nmbe_range"],
-
-            # NEW (Q4 diagnostics): compound discrepancy (REF proxy vs CLU CEM)
-            "e_proxy_ref_vs_cem_clu_pearson_r": comp_lvl_sum["pearson_r"],
-            "e_proxy_ref_vs_cem_clu_nrmse_range": comp_lvl_sum["nrmse_range"],
-            "e_proxy_ref_vs_cem_clu_nmae_range": comp_lvl_sum["nmae_range"],
-            "e_proxy_ref_vs_cem_clu_nmbe_range": comp_lvl_sum["nmbe_range"],
-
-            "e_proxy_delta_ref_vs_cem_delta_clu_pearson_r": comp_delta_sum["pearson_r"],
-            "e_proxy_delta_ref_vs_cem_delta_clu_nrmse_range": comp_delta_sum["nrmse_range"],
-            "e_proxy_delta_ref_vs_cem_delta_clu_nmae_range": comp_delta_sum["nmae_range"],
-            "e_proxy_delta_ref_vs_cem_delta_clu_nmbe_range": comp_delta_sum["nmbe_range"],
-
-
-            # cyclic peak timing/magnitude + windowed diagnostics
-            **peak_win,
-        })
+        rows.append(
+            {
+                "model_id": model_id,
+                "tvp": tvp,
+                "country": ref_key.country,
+                "reference_id": ref_id,
+                "reference_nc": ref_key.ref_nc,
+                "reference_tvp": ref_key.ref_tvp,
+                "resample_freq": RESAMPLE_FREQ if RESAMPLE_FREQ else "hourly",
+                "dates": str(r["dates"]),
+                "window_id": window_id,
+                # log hyperparams (if present)
+                "Wp": wp_val,
+                "k": k_val,
+                # capacities
+                "ldes_cap_ref_maxsoc": baseline.ldes_cap_ref,
+                "ldes_cap_clu_maxsoc": ldes_cap_clu,
+                "ldes_cap_error_signed": cap_err_signed,
+                "ldes_cap_error_abs": cap_err_abs,
+                # proxy error (reference)
+                "proxy_ref_pearson_r": metrics_proxy_ref["pearson_r"],
+                "proxy_ref_nrmse_range": metrics_proxy_ref["nrmse_range"],
+                "proxy_ref_nmae_range": metrics_proxy_ref["nmae_range"],
+                "proxy_ref_nmbe_range": metrics_proxy_ref["nmbe_range"],
+                # proxy error (clustered)
+                "proxy_clu_pearson_r": metrics_proxy_clu["pearson_r"],
+                "proxy_clu_nrmse_range": metrics_proxy_clu["nrmse_range"],
+                "proxy_clu_nmae_range": metrics_proxy_clu["nmae_range"],
+                "proxy_clu_nmbe_range": metrics_proxy_clu["nmbe_range"],
+                # TSA error (proxy clustered vs proxy reference)
+                "tsa_pearson_r": metrics_tsa["pearson_r"],
+                "tsa_nrmse_range": metrics_tsa["nrmse_range"],
+                "tsa_nmae_range": metrics_tsa["nmae_range"],
+                "tsa_nmbe_range": metrics_tsa["nmbe_range"],
+                # signal locations
+                "cem_soc_parquet": cem_parq,
+                "soc_proxy_parquet": proxy_parq,
+                # aligned stepwise error summaries
+                "e_proxy_ref_pearson_r": e_proxy_ref_sum["pearson_r"],
+                "e_proxy_ref_nrmse_range": e_proxy_ref_sum["nrmse_range"],
+                "e_proxy_ref_nmae_range": e_proxy_ref_sum["nmae_range"],
+                "e_proxy_ref_nmbe_range": e_proxy_ref_sum["nmbe_range"],
+                "e_proxy_clu_pearson_r": e_proxy_clu_sum["pearson_r"],
+                "e_proxy_clu_nrmse_range": e_proxy_clu_sum["nrmse_range"],
+                "e_proxy_clu_nmae_range": e_proxy_clu_sum["nmae_range"],
+                "e_proxy_clu_nmbe_range": e_proxy_clu_sum["nmbe_range"],
+                "e_tsa_proxy_pearson_r": e_tsa_proxy_sum["pearson_r"],
+                "e_tsa_proxy_nrmse_range": e_tsa_proxy_sum["nrmse_range"],
+                "e_tsa_proxy_nmae_range": e_tsa_proxy_sum["nmae_range"],
+                "e_tsa_proxy_nmbe_range": e_tsa_proxy_sum["nmbe_range"],
+                "e_tsa_cem_pearson_r": e_tsa_cem_sum["pearson_r"],
+                "e_tsa_cem_nrmse_range": e_tsa_cem_sum["nrmse_range"],
+                "e_tsa_cem_nmae_range": e_tsa_cem_sum["nmae_range"],
+                "e_tsa_cem_nmbe_range": e_tsa_cem_sum["nmbe_range"],
+                # deltas
+                "e_tsa_proxy_delta_pearson_r": d_tsa_proxy_sum["pearson_r"],
+                "e_tsa_proxy_delta_nrmse_range": d_tsa_proxy_sum["nrmse_range"],
+                "e_tsa_proxy_delta_nmae_range": d_tsa_proxy_sum["nmae_range"],
+                "e_tsa_proxy_delta_nmbe_range": d_tsa_proxy_sum["nmbe_range"],
+                "e_proxy_delta_ref_vs_cem_delta_ref_pearson_r": d_base_ref_sum[
+                    "pearson_r"
+                ],
+                "e_proxy_delta_ref_vs_cem_delta_ref_nrmse_range": d_base_ref_sum[
+                    "nrmse_range"
+                ],
+                "e_proxy_delta_ref_vs_cem_delta_ref_nmae_range": d_base_ref_sum[
+                    "nmae_range"
+                ],
+                "e_proxy_delta_ref_vs_cem_delta_ref_nmbe_range": d_base_ref_sum[
+                    "nmbe_range"
+                ],
+                "e_proxy_delta_clu_vs_cem_delta_clu_pearson_r": d_base_clu_sum[
+                    "pearson_r"
+                ],
+                "e_proxy_delta_clu_vs_cem_delta_clu_nrmse_range": d_base_clu_sum[
+                    "nrmse_range"
+                ],
+                "e_proxy_delta_clu_vs_cem_delta_clu_nmae_range": d_base_clu_sum[
+                    "nmae_range"
+                ],
+                "e_proxy_delta_clu_vs_cem_delta_clu_nmbe_range": d_base_clu_sum[
+                    "nmbe_range"
+                ],
+                # NEW (Q4 diagnostics): compound discrepancy (REF proxy vs CLU CEM)
+                "e_proxy_ref_vs_cem_clu_pearson_r": comp_lvl_sum["pearson_r"],
+                "e_proxy_ref_vs_cem_clu_nrmse_range": comp_lvl_sum["nrmse_range"],
+                "e_proxy_ref_vs_cem_clu_nmae_range": comp_lvl_sum["nmae_range"],
+                "e_proxy_ref_vs_cem_clu_nmbe_range": comp_lvl_sum["nmbe_range"],
+                "e_proxy_delta_ref_vs_cem_delta_clu_pearson_r": comp_delta_sum[
+                    "pearson_r"
+                ],
+                "e_proxy_delta_ref_vs_cem_delta_clu_nrmse_range": comp_delta_sum[
+                    "nrmse_range"
+                ],
+                "e_proxy_delta_ref_vs_cem_delta_clu_nmae_range": comp_delta_sum[
+                    "nmae_range"
+                ],
+                "e_proxy_delta_ref_vs_cem_delta_clu_nmbe_range": comp_delta_sum[
+                    "nmbe_range"
+                ],
+                # cyclic peak timing/magnitude + windowed diagnostics
+                **peak_win,
+            }
+        )
 
     df_out = pd.DataFrame(rows)
     df_out.to_csv(output_csv, index=False)
     return df_out
+
 
 # =============================================================================
 # CLI entrypoint
