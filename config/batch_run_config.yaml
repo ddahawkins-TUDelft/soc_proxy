@@ -1,0 +1,1624 @@
+endo_test:
+  Medoid, k=30, Endogenous Correction, L=0/0:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.01
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 0.000001
+        optimisation: 0.000001
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Medoid, k=30, Endogenous Correction, L=0.5/0.5:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.5
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 0.5
+        optimisation: 0.01
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Medoid, k=30, Endogenous Correction, L=1/1:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.01
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 1
+        optimisation: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Medoid, k=30, Endogenous Correction, L=0/1:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.01
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 0.000001
+        optimisation: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Medoid, k=30, Endogenous Correction, L=0/1:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.01
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 1
+        optimisation: 0.000001
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Medoid, k=30, Endogenous Correction, L=0.75/0.75:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.01
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 0.75
+        optimisation: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Medoid, k=30, Endogenous Correction, L=0.75/1:
+    dispatch_mode: 'cluster_with_optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      mipgap: 0.01
+      timelimit: 1200
+      lambda_soc: 
+        cluster: 0.75
+        optimisation: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: endogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+
+
+optimisation_test:
+  Exogenous, k=30, λ=0:
+    dispatch_mode: 'optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      timelimit: 3600
+      lambda_soc: 
+        cluster: 0
+        optimisation: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: exogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  Exogenous, k=30, λ=1:
+    dispatch_mode: 'optimisation'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      # k_periods_optimisation: 30
+      resample_to_daily_resolution: True
+      distance_matrix_metric: 'euclidean'
+      timelimit: 3600
+      lambda_soc: 
+        cluster: 1
+        optimisation: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+          optimisation_proxy_mode: exogenous
+      post_cluster_optimisation_params:
+        objective:
+          - polarity: minimise
+            target: soc_proxy_ldes
+            weight: 1
+            mode: match
+  # Exogenous, k=30, λ=1:
+  #   dispatch_mode: 'optimisation'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     # k_periods_optimisation: 30
+  #     resample_to_daily_resolution: True
+  #     distance_matrix_metric: 'euclidean'
+  #     timelimit: 3600
+  #     lambda_soc: 
+  #       cluster: 1
+  #       optimisation: 1
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #         optimisation_proxy_mode: exogenous
+  #     post_cluster_optimisation_params:
+  #       objective:
+  #         - polarity: minimise
+  #           target: soc_proxy_ldes
+  #           weight: 1
+  #           mode: match
+  # Endogenous, k=30, λ=0.5:
+  #   dispatch_mode: 'optimisation'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     # k_periods_optimisation: 30
+  #     resample_to_daily_resolution: True
+  #     distance_matrix_metric: 'euclidean'
+  #     timelimit: 3600
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #       optimisation: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #         optimisation_proxy_mode: endogenous
+  #     post_cluster_optimisation_params:
+  #       objective:
+  #         - polarity: minimise
+  #           target: soc_proxy_ldes
+  #           weight: 1
+  #           mode: match
+  # Endogenous, k=30, λ=1:
+  #   dispatch_mode: 'optimisation'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     # k_periods_optimisation: 30
+  #     resample_to_daily_resolution: True
+  #     distance_matrix_metric: 'euclidean'
+  #     timelimit: 3600
+  #     lambda_soc: 
+  #       cluster: 1
+  #       optimisation: 1
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #         optimisation_proxy_mode: endogenous
+  #     post_cluster_optimisation_params:
+  #       objective:
+  #         - polarity: minimise
+  #           target: soc_proxy_ldes
+  #           weight: 1
+  #           mode: match
+
+standard_60:
+  K-Medoid, reps=60, W_proxy=0:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      # margin_value: 0.06
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      # margin_value: 0.0
+      # margin_mode: none
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_W_reps14:
+  K-Medoid, reps=14, W_proxy=0.0:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 14
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=14, SocDelta, W_proxy=0.25:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 14
+      lambda_soc: 
+        cluster: 0.25
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=14, SocDelta, W_proxy=0.5:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 14
+      lambda_soc: 
+        cluster: 0.5
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=14, SocDelta, W_proxy=0.75:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 14
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=14, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 14
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+
+Sensitivity_W_reps30:
+  # K-Medoid, reps=30, W_proxy=0.0:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     lambda_soc: 
+  #       cluster: 0
+  #     soc_proxy: 
+  #         use_soc_proxy: False
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=30, SocDelta, W_proxy=0.25:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     lambda_soc: 
+  #       cluster: 0.25
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=30, SocDelta, W_proxy=0.5:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=30, SocDelta, W_proxy=0.75:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 30
+  #     lambda_soc: 
+  #       cluster: 0.75
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  K-Medoid, reps=30, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 30
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_W_reps45:
+  # K-Medoid, reps=45, W_proxy=0.0:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 45
+  #     lambda_soc: 
+  #       cluster: 0
+  #     soc_proxy: 
+  #         use_soc_proxy: False
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=45, SocDelta, W_proxy=0.25:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 45
+  #     lambda_soc: 
+  #       cluster: 0.25
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=45, SocDelta, W_proxy=0.5:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 45
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=45, SocDelta, W_proxy=0.75:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 45
+  #     lambda_soc: 
+  #       cluster: 0.75
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  K-Medoid, reps=45, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 45
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_W_reps60:
+  # K-Medoid, reps=60, W_proxy=0.0:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 60
+  #     lambda_soc: 
+  #       cluster: 0
+  #     soc_proxy: 
+  #         use_soc_proxy: False
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=60, SocDelta, W_proxy=0.25:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 60
+  #     lambda_soc: 
+  #       cluster: 0.25
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=60, SocDelta, W_proxy=0.5:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 60
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=60, SocDelta, W_proxy=0.75:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 60
+  #     lambda_soc: 
+  #       cluster: 0.75
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  K-Medoid, reps=60, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_W_reps90:
+  # K-Medoid, reps=90, W_proxy=0.0:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 90
+  #     lambda_soc: 
+  #       cluster: 0
+  #     soc_proxy: 
+  #         use_soc_proxy: False
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=90, SocDelta, W_proxy=0.25:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 90
+  #     lambda_soc: 
+  #       cluster: 0.25
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=90, SocDelta, W_proxy=0.5:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 90
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=90, SocDelta, W_proxy=0.75:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 90
+  #     lambda_soc: 
+  #       cluster: 0.75
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  K-Medoid, reps=90, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_W_reps180:
+  # K-Medoid, reps=180, W_proxy=0.0:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 180
+  #     lambda_soc: 
+  #       cluster: 0
+  #     soc_proxy: 
+  #         use_soc_proxy: False
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=180, SocDelta, W_proxy=0.25:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 180
+  #     lambda_soc: 
+  #       cluster: 0.25
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=180, SocDelta, W_proxy=0.5:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 180
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=180, SocDelta, W_proxy=0.75:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 180
+  #     lambda_soc: 
+  #       cluster: 0.75
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  K-Medoid, reps=180, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_W_reps365:
+  # K-Medoid, reps=365, W_proxy=0.0:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 365
+  #     lambda_soc: 
+  #       cluster: 0
+  #     soc_proxy: 
+  #         use_soc_proxy: False
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=365, SocDelta, W_proxy=0.25:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 365
+  #     lambda_soc: 
+  #       cluster: 0.25
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=365, SocDelta, W_proxy=0.5:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 365
+  #     lambda_soc: 
+  #       cluster: 0.5
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  # K-Medoid, reps=365, SocDelta, W_proxy=0.75:
+  #   dispatch_mode: 'cluster'
+  #   calliope_params:
+  #   soc_proxy_params:
+  #   tsa_params:
+  #     k_periods: 365
+  #     lambda_soc: 
+  #       cluster: 0.75
+  #     soc_proxy: 
+  #         use_soc_proxy: True
+  #         proxy_inputs_to_consider: ['surplus_LDES'] 
+  #         proxy_window: None
+  #     soc_features:
+  K-Medoid, reps=365, SocDelta, W_proxy=1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 365
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+Sensitivity_margin_W1_reps60:
+  K-Medoid, reps=60, W_proxy=1.0, m=0.00:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.00
+      margin_mode: none
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60, W_proxy=1.0, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60, W_proxy=1.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.04
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60, W_proxy=1.0, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60, W_proxy=1.0, m=0.08:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.08
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+
+margin_sensitivity_60-180_m=0.04:
+  K-Medoid, reps=60 W_proxy=0.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=0.75, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=1, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.75, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=1, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.75, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=1, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+margin_sensitivity_60-180_m=0.1:
+  K-Medoid, reps=60 W_proxy=0.0, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=0.75, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=1, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.0, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.75, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=1, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.0, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.75, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=1, m=0.1:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.1
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+margin_sensitivity_60-180_m=0.14:
+  K-Medoid, reps=60 W_proxy=0.0, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=0.75, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=1, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.0, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.75, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=1, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.0, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.75, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=1, m=0.14:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.14
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+margin_sensitivity_60-180_m=0.04:
+  K-Medoid, reps=60 W_proxy=0.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=0.75, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=1, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.75, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=1, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.0, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.75, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=1, m=0.04:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+margin_sensitivity_60-180_m=0.06:
+  K-Medoid, reps=60 W_proxy=0.0, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=0.75, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=1, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.0, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.75, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=1, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.0, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.75, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=1, m=0.06:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.06
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+
+margin_sensitivity_60-180_m=0.02:
+  K-Medoid, reps=60 W_proxy=0.0, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=0.75, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=60 W_proxy=1, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 60
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.0, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=0.75, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=90, W_proxy=1, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 90
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.0, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0
+      soc_proxy: 
+          use_soc_proxy: False
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=0.75, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 0.75
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
+  K-Medoid, reps=180, W_proxy=1, m=0.02:
+    dispatch_mode: 'cluster'
+    calliope_params:
+    soc_proxy_params:
+      margin_value: 0.02
+    tsa_params:
+      k_periods: 180
+      lambda_soc: 
+        cluster: 1
+      soc_proxy: 
+          use_soc_proxy: True
+          proxy_inputs_to_consider: ['surplus_LDES'] 
+          proxy_window: None
+      soc_features:
