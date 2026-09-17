@@ -50,28 +50,9 @@ defaults:
 
 experiments:
 
-  baseline:
+  baseline_NL:
     {}
 
-  smoke_no_proxy:
+  baseline_BE:
     data_params:
-      start_date: 2010-01-01
-      end_date: 2010-03-01
-
-    tsa_params:
-      k_periods: 5
-
-      soc_proxy:
-        enabled: false
-
-  smoke_proxy:
-    data_params:
-      start_date: 2010-01-01
-      end_date: 2010-03-01
-
-    tsa_params:
-      k_periods: 5
-
-      soc_proxy:
-        enabled: true
-        lambda_soc: 0.5
+      country: BE

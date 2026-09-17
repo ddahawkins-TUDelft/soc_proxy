@@ -30,16 +30,18 @@ calliope.set_log_verbosity(
 
 configs = load_experiment_config("config/experiment_config.yaml")
 
-config = configs["baseline"]
+config = configs["baseline_BE"]
 
 
 # ---------------------------------------------------------------------------
 # 2. Run clustered experiment
 # ---------------------------------------------------------------------------
 
+timeseries_path = f"resources/raw_timeseries/time_varying_parameters_{config['data_params']['country']}.csv"
+
 result = run_case(
     config,
-    "resources/raw_timeseries/time_varying_parameters_NL.csv",
+    timeseries_path,
     model_path="config/calliope/model.yaml",
 )
 
@@ -94,6 +96,18 @@ print(
     f"Clustered SoC range: {clustered_soc.min():.2f} to {clustered_soc.max():.2f} MWh"
 )
 
+# ---------------------------------------------------------------------------
+# 6. Results recording
+# ---------------------------------------------------------------------------
+
+
+case_id = record_case_results(
+    config,
+    result,
+    reference_model,
+)
+
+print(f"Recorded case: {case_id}")
 
 # ---------------------------------------------------------------------------
 # 6. Plot
@@ -110,13 +124,5 @@ fig, ax = plot_soc_proxy_comparison(
 )
 
 plt.show()
-
-case_id = record_case_results(
-    config,
-    result,
-    reference_model,
-)
-
-print(f"Recorded case: {case_id}")
 
 consolidate_results()
