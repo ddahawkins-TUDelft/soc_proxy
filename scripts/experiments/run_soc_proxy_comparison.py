@@ -2,7 +2,7 @@
 
 import calliope
 import matplotlib.pyplot as plt
-
+import pandas as pd
 from scripts.helpers.config import load_experiment_config
 from scripts.helpers.reference_models import load_reference_model
 from scripts.helpers.results_signals import (
@@ -12,6 +12,10 @@ from scripts.helpers.results_signals import (
 from scripts.pipeline import run_case
 from scripts.plots.soc_proxy_comparison import (
     plot_soc_proxy_comparison,
+)
+from scripts.helpers.results import (
+    record_case_results,
+    consolidate_results
 )
 
 calliope.set_log_verbosity(
@@ -106,3 +110,13 @@ fig, ax = plot_soc_proxy_comparison(
 )
 
 plt.show()
+
+case_id = record_case_results(
+    config,
+    result.calliope_model,
+    reference_model,
+)
+
+print(f"Recorded case: {case_id}")
+
+consolidate_results()
