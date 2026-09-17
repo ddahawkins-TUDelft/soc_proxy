@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -10,6 +11,7 @@ from tsam import AggregationResult
 
 from soc_proxy import generate_soc_proxy
 
+from scripts.helpers.timeseries import read_calliope_timeseries
 from scripts.helpers.tsa import (
     build_cluster_config,
     build_weights,
@@ -30,6 +32,26 @@ class TSAArtifacts:
     cluster_map: pd.Series
     reconstructed_timeseries: pd.DataFrame
     reconstructed_proxy: pd.DataFrame
+
+
+def load_case_timeseries(
+    config: dict[str, Any],
+    source: str | Path,
+) -> pd.DataFrame:
+    """Load the exact model horizon defined by one resolved experiment.
+
+    The project source files use Calliope's multi-row CSV format. This adapter
+    converts that format to the simple dataframe used by the SoC Proxy and
+    TSAM, while enforcing the experiment's half-open ``[start_date, end_date)``
+    horizon.
+    """
+    data_params = config["data_params"]
+
+    return read_calliope_timeseries(
+        source,
+        start=data_params["start_date"],
+        end=data_params["end_date"],
+    )
 
 
 def run_tsa_case(
@@ -150,7 +172,10 @@ def _build_clustering_features(
     lambda_soc = soc_config["lambda_soc"]
 
     if proxy_column not in proxy.columns:
-        raise ValueError(...)
+        raise ValueError(
+            f"Configured proxy field {proxy_column!r} was not generated. "
+            f"Available fields are: {list(proxy.columns)}"
+        )
 
     if lambda_soc == 0:
         return timeseries.copy(), None
@@ -181,13 +206,9 @@ def _build_tsa_weights(
         return None
 
     if lambda_soc == 1:
-        # Handled upstream by reducing the feature set to the proxy alone.
-        #
-        # We will implement that explicitly once lambda=1 experiments are
-        # included in the experiment portfolio.
-        raise NotImplementedError(
-            "lambda_soc=1 requires clustering on the proxy feature alone."
-        )
+        # Feature construction has already reduced the clustering input to the
+        # proxy alone, so TSAM's default equal weighting is sufficient.
+        return None
 
     return build_weights(
         features.columns,
@@ -205,6 +226,14 @@ def _generate_proxy(
     This adapter is intentionally isolated because the public
     ``generate_soc_proxy`` API is the next component we intend to clean up.
     """
+    if "economic_modifier_m" in params:
+        raise NotImplementedError(
+            "The rebuilt experiment config defines 'economic_modifier_m', "
+            "but generate_soc_proxy() does not yet implement that parameter. "
+            "Implement its intended semantics before running experiments so "
+            "the configured value cannot be silently ignored."
+        )
+
     result, _, _ = generate_soc_proxy(
         df=timeseries,
         renewables_fields_and_weights=params[
