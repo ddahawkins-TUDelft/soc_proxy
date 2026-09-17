@@ -24,6 +24,9 @@ from scripts.helpers.results_parameters import (
 from scripts.helpers.results_investment_metrics import (
     calculate_investment_metrics,
 )
+from scripts.helpers.results_signal_metrics import (
+    extract_signal_metrics,
+)
 
 
 _CASE_CONFIG_KEYS = (
@@ -44,6 +47,7 @@ class CaseResults:
     capacities: pd.DataFrame
     costs: pd.DataFrame
     investment_metrics: pd.DataFrame
+    signal_metrics: pd.DataFrame
 
 
 def generate_case_id(
@@ -72,11 +76,13 @@ def generate_case_id(
 
 def extract_case_results(
     config: dict,
-    model,
+    case,
     reference_model,
 ) -> CaseResults:
     """Extract all persistent results for one solved case."""
     case_id = generate_case_id(config)
+
+    model = case.calliope_model
 
     parameters = extract_parameters(
         config,
@@ -117,9 +123,18 @@ def extract_case_results(
     )
 
     investment_metrics = calculate_investment_metrics(
-    capacities,
-    costs,
-)
+        capacities,
+        costs,
+    )
+
+    signal_metrics = extract_signal_metrics(
+        case_id=case_id,
+        reference_model=reference_model,
+        clustered_model=model,
+        original_proxy=case.tsa.original_proxy,
+        reconstructed_proxy=case.tsa.reconstructed_proxy,
+        cluster_map=case.tsa.cluster_map,
+    )
 
     return CaseResults(
         case_id=case_id,
@@ -127,12 +142,12 @@ def extract_case_results(
         capacities=capacities,
         costs=costs,
         investment_metrics=investment_metrics,
+        signal_metrics=signal_metrics,
     )
-
 
 def record_case_results(
     config: dict,
-    model,
+    case,
     reference_model,
     *,
     results_dir: str | Path = "results",
@@ -146,7 +161,7 @@ def record_case_results(
     """
     results = extract_case_results(
         config,
-        model,
+        case,
         reference_model,
     )
 
@@ -172,6 +187,11 @@ def record_case_results(
         root / "investment_metrics" / f"{results.case_id}.parquet",
     )
 
+    _write_fragment(
+        results.signal_metrics,
+        root / "signal_metrics" / f"{results.case_id}.parquet",
+    )
+
     return results.case_id
 
 
@@ -187,6 +207,7 @@ def consolidate_results(
         "capacities",
         "costs",
         "investment_metrics",
+        "signal_metrics",
     ):
         source = root / "_fragments" / table
         paths = sorted(source.glob("*.parquet"))

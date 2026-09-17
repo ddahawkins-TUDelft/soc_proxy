@@ -113,7 +113,7 @@ plt.show()
 
 case_id = record_case_results(
     config,
-    result.calliope_model,
+    result,
     reference_model,
 )
 
