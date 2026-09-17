@@ -1,5 +1,6 @@
 """Run one experiment and plot the SoC Proxy diagnostic."""
 
+import calliope
 import matplotlib.pyplot as plt
 
 from scripts.helpers.config import load_experiment_config
@@ -13,14 +14,17 @@ from scripts.plots.soc_proxy_comparison import (
     plot_soc_proxy_comparison,
 )
 
+calliope.set_log_verbosity(
+    "info",
+    include_solver_output=True,
+)
+
 
 # ---------------------------------------------------------------------------
 # 1. Load experiment
 # ---------------------------------------------------------------------------
 
-configs = load_experiment_config(
-    "config/experiment_config.yaml"
-)
+configs = load_experiment_config("config/experiment_config.yaml")
 
 config = configs["baseline"]
 
@@ -40,9 +44,7 @@ result = run_case(
 # 3. Load matching full-chronology reference
 # ---------------------------------------------------------------------------
 
-reference_model = load_reference_model(
-    config
-)
+reference_model = load_reference_model(config)
 
 
 # ---------------------------------------------------------------------------
@@ -82,12 +84,10 @@ assert reference_soc.index.equals(clustered_proxy.index)
 
 print()
 print(
-    f"Reference SoC range: "
-    f"{reference_soc.min():.2f} to {reference_soc.max():.2f} MWh"
+    f"Reference SoC range: {reference_soc.min():.2f} to {reference_soc.max():.2f} MWh"
 )
 print(
-    f"Clustered SoC range: "
-    f"{clustered_soc.min():.2f} to {clustered_soc.max():.2f} MWh"
+    f"Clustered SoC range: {clustered_soc.min():.2f} to {clustered_soc.max():.2f} MWh"
 )
 
 

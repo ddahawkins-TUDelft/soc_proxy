@@ -10,13 +10,23 @@ the full chronology or with representative-day clustering.
 
 from __future__ import annotations
 
-import calliope
 import numpy as np
 import pandas as pd
 
+from typing import Protocol
+
+import xarray as xr
+
+
+class ModelData(Protocol):
+    """Solved model data required by signal extraction helpers."""
+
+    inputs: xr.Dataset
+    results: xr.Dataset
+
 
 def extract_storage_soc(
-    model: calliope.Model,
+    model: ModelData,
     *,
     node: str = "netherlands",
     tech: str = "h2_salt_cavern",
@@ -100,7 +110,7 @@ def extract_proxy_signal(
 
 
 def _extract_reference_storage_soc(
-    model: calliope.Model,
+    model: ModelData,
     *,
     node: str,
     tech: str,
@@ -140,7 +150,7 @@ def _extract_reference_storage_soc(
 
 
 def _reconstruct_clustered_storage_soc(
-    model: calliope.Model,
+    model: ModelData,
     *,
     cluster_map: pd.Series,
     node: str,
@@ -297,7 +307,7 @@ def _reconstruct_clustered_storage_soc(
 
 
 def _select_result(
-    model: calliope.Model,
+    model: ModelData,
     variable: str,
     *,
     node: str,
@@ -331,7 +341,7 @@ def _select_result(
 
 
 def _get_input_scalar(
-    model: calliope.Model,
+    model: ModelData,
     variable: str,
     *,
     node: str,
@@ -395,7 +405,7 @@ def _validate_cluster_map(
 
 
 def _validate_soc_bounds(
-    model: calliope.Model,
+    model: ModelData,
     soc: pd.Series,
     *,
     node: str,
@@ -442,7 +452,7 @@ def _validate_soc_bounds(
 
 
 def _require_result(
-    model: calliope.Model,
+    model: ModelData,
     variable: str,
 ) -> None:
     """Require a solved model result variable."""

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import calliope
 import pandas as pd
+import xarray as xr
 
 
 DEFAULT_REFERENCE_DIR = Path(
@@ -14,29 +15,30 @@ DEFAULT_REFERENCE_DIR = Path(
 )
 
 
+@dataclass(frozen=True)
+class ReferenceModel:
+    """Numerical data loaded from a historical Calliope reference model.
+
+    Historical reference NetCDF files may have been written by older
+    Calliope 0.7 development versions whose serialized model definitions are
+    no longer accepted by the current schema.
+
+    For analysis we only require the stored numerical inputs and results, so
+    these are loaded directly from their NetCDF groups without asking Calliope
+    to reconstruct the original model definition.
+    """
+
+    path: Path
+    inputs: xr.Dataset
+    results: xr.Dataset
+
+
 def resolve_reference_model_path(
     config: dict[str, Any],
     *,
     reference_dir: str | Path = DEFAULT_REFERENCE_DIR,
 ) -> Path:
-    """Find the reference model corresponding to one experiment.
-
-    Existing reference models use calendar-year horizons and filenames of the
-    form::
-
-        standard_<start_year>_<end_year>_reference_<country>.nc
-
-    Experiment horizons use a half-open ``[start_date, end_date)`` convention.
-
-    Raises
-    ------
-    ValueError
-        If the requested horizon is not aligned to complete calendar years.
-        Non-calendar horizons (e.g. April-March) require newly generated
-        reference models.
-    FileNotFoundError
-        If the expected reference model does not exist.
-    """
+    """Find the calendar-year reference corresponding to one experiment."""
     data_params = config["data_params"]
 
     start = pd.Timestamp(
@@ -53,7 +55,6 @@ def resolve_reference_model_path(
             "end_date must be later than start_date."
         )
 
-    # Existing references represent complete January-December years.
     if not (
         start.month == 1
         and start.day == 1
@@ -61,9 +62,9 @@ def resolve_reference_model_path(
         and end.day == 1
     ):
         raise ValueError(
-            "No historical calendar-year reference can be inferred for "
-            f"[{start.date()}, {end.date()}). "
-            "A matching reference model must be generated for this horizon."
+            "Existing reference models represent complete calendar-year "
+            "horizons. No matching historical reference can be inferred for "
+            f"[{start.date()}, {end.date()})."
         )
 
     start_year = start.year
@@ -78,8 +79,7 @@ def resolve_reference_model_path(
 
     if not path.is_file():
         raise FileNotFoundError(
-            "Expected reference model does not exist: "
-            f"{path}"
+            f"Expected reference model does not exist: {path}"
         )
 
     return path
@@ -89,11 +89,38 @@ def load_reference_model(
     config: dict[str, Any],
     *,
     reference_dir: str | Path = DEFAULT_REFERENCE_DIR,
-) -> calliope.Model:
-    """Load the reference model corresponding to one experiment."""
+) -> ReferenceModel:
+    """Load stored numerical data from the matching reference model."""
     path = resolve_reference_model_path(
         config,
         reference_dir=reference_dir,
     )
 
-    return calliope.read_netcdf(path)
+    try:
+        with xr.open_dataset(
+            path,
+            group="inputs",
+        ) as dataset:
+            inputs = dataset.load()
+
+        with xr.open_dataset(
+            path,
+            group="results",
+        ) as dataset:
+            results = dataset.load()
+
+    except Exception as error:
+        raise RuntimeError(
+            f"Could not load numerical data from reference model {path}."
+        ) from error
+
+    if not results.data_vars:
+        raise RuntimeError(
+            f"Reference model contains no solved results: {path}"
+        )
+
+    return ReferenceModel(
+        path=path,
+        inputs=inputs,
+        results=results,
+    )

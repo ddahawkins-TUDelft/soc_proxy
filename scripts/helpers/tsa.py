@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from typing import Any
+from time import perf_counter
 
 import pandas as pd
 import tsam
@@ -218,18 +219,25 @@ def run_tsa(
     extremes: ExtremeConfig | None = None,
     preserve_column_means: bool = True,
     rescale_exclude_columns: list[str] | None = None,
+    verbose: bool = False,
 ) -> AggregationResult:
-    """Run a TSAM aggregation.
-
-    This function remains intentionally thin. Clustering and representation
-    behaviour is defined through native TSAM configuration objects.
-    """
+    """Run a TSAM aggregation."""
     _validate_timeseries(data)
 
     if n_clusters < 1:
         raise ValueError("n_clusters must be at least 1.")
 
-    return tsam.aggregate(
+    if verbose:
+        print(
+            "[TSAM] Starting aggregation: "
+            f"{len(data):,} timesteps, "
+            f"{len(data.columns)} features, "
+            f"{n_clusters} clusters"
+        )
+
+    start = perf_counter()
+
+    result = tsam.aggregate(
         data,
         n_clusters=n_clusters,
         period_duration=period_duration,
@@ -240,6 +248,16 @@ def run_tsa(
         preserve_column_means=preserve_column_means,
         rescale_exclude_columns=rescale_exclude_columns,
     )
+
+    elapsed = perf_counter() - start
+
+    if verbose:
+        print(
+            f"[TSAM] Aggregation complete in {elapsed:.1f} s "
+            f"(clustering: {result.clustering_duration:.1f} s)"
+        )
+
+    return result
 
 
 def apply_tsa_to_timeseries(
@@ -332,30 +350,69 @@ def prepare_calliope_inputs(
 ) -> tuple[pd.Series, pd.DataFrame]:
     """Prepare temporal inputs for a clustered Calliope model.
 
-    The fitted TSAM clustering is applied to the complete Calliope input
-    timeseries. TSAM therefore applies the selected representation method to
-    all model inputs consistently.
+    The fitted TSAM clustering is transferred to the complete Calliope
+    timeseries. Any clustering-only features required by TSAM during transfer
+    are temporarily restored from the original clustering dataframe and then
+    removed again from the reconstructed Calliope input.
 
     Returns
     -------
     cluster_map
         Daily mapping from original dates to representative dates.
     reconstructed_timeseries
-        Full-length timeseries in which each original period has been replaced
-        by its TSAM representative profile.
+        Full-length reconstructed Calliope timeseries containing only the
+        columns originally supplied in ``calliope_timeseries``.
     """
+    _validate_timeseries(calliope_timeseries)
+
+    target_columns = list(calliope_timeseries.columns)
+
+    transfer_data = calliope_timeseries.copy()
+
+    # Clustering may have been fitted using additional features which are not
+    # Calliope inputs (e.g. surplus_LDES). TSAM's transferred clustering
+    # validates its stored weights against the new dataframe, so those
+    # clustering-only columns must temporarily be present during apply().
+    clustering_weights = tsa_result.clustering.weights or {}
+
+    missing_weight_columns = [
+        column
+        for column in clustering_weights
+        if column not in transfer_data.columns
+    ]
+
+    for column in missing_weight_columns:
+        if column not in tsa_result.original.columns:
+            raise ValueError(
+                "TSAM clustering requires transfer column "
+                f"{column!r}, but it is unavailable in both the Calliope "
+                "timeseries and the original clustering dataframe."
+            )
+
+        transfer_data[column] = tsa_result.original[column]
+
     calliope_result = apply_tsa_to_timeseries(
         tsa_result,
-        calliope_timeseries,
+        transfer_data,
     )
 
-    cluster_map = build_calliope_cluster_map(calliope_result)
+    cluster_map = build_calliope_cluster_map(
+        calliope_result,
+    )
+
+    # Discard clustering-only features. Calliope must receive exactly its
+    # original physical timeseries fields.
+    reconstructed_timeseries = (
+        calliope_result.reconstructed[
+            target_columns
+        ]
+        .copy()
+    )
 
     return (
         cluster_map,
-        calliope_result.reconstructed.copy(),
+        reconstructed_timeseries,
     )
-
 
 def _build_representation(
     representation_params: dict[str, Any] | None,

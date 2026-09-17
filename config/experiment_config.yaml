@@ -30,7 +30,7 @@ defaults:
       proxy_field_name: surplus_LDES
 
     cluster:
-      method: kmedoids
+      method: hierarchical
       random_state: 42
 
     representation:
@@ -50,6 +50,9 @@ defaults:
 
 experiments:
 
+  baseline:
+    {}
+
   smoke_no_proxy:
     data_params:
       start_date: 2010-01-01
@@ -60,12 +63,6 @@ experiments:
 
       soc_proxy:
         enabled: false
-
-      cluster:
-        method: kmeans
-
-      representation:
-        method: medoid
 
   smoke_proxy:
     data_params:
@@ -78,9 +75,3 @@ experiments:
       soc_proxy:
         enabled: true
         lambda_soc: 0.5
-
-      cluster:
-        method: kmeans
-
-      representation:
-        method: medoid

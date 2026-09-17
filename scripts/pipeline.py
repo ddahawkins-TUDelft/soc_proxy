@@ -165,6 +165,7 @@ def run_tsa_case(
             "preserve_column_means",
             True,
         ),
+        verbose=True
     )
 
     # ------------------------------------------------------------------
