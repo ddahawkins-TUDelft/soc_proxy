@@ -477,8 +477,13 @@ def generate_soc_proxy(
     )
 
     # Clean tiny numerical noise
-    for col in ["soc_proxy_LDES", "soc_proxy_SDES", "surplus_LDES", "surplus_SDES"]:
-        arr = df[col].to_numpy(np.float64)
+    for col in [
+        "soc_proxy_LDES",
+        "soc_proxy_SDES",
+        "surplus_LDES",
+        "surplus_SDES",
+    ]:
+        arr = df[col].to_numpy(dtype=np.float64, copy=True)
         arr[np.abs(arr) < 1e-9] = 0.0
         df[col] = arr
 
