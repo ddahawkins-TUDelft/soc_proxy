@@ -97,13 +97,9 @@ def build_cluster_config(
         method = method_name
 
     else:
-        raise ValueError(
-            f"Unsupported TSAM clustering method: {method_name!r}"
-        )
+        raise ValueError(f"Unsupported TSAM clustering method: {method_name!r}")
 
-    representation = _build_representation(
-        tsa_params.get("representation")
-    )
+    representation = _build_representation(tsa_params.get("representation"))
 
     return ClusterConfig(
         method=method,
@@ -182,18 +178,12 @@ def build_weights(
         )
 
     if proxy_weight is None:
-        raise ValueError(
-            "proxy_weight must be provided when a proxy column is used."
-        )
+        raise ValueError("proxy_weight must be provided when a proxy column is used.")
 
     if not 0 <= proxy_weight <= 1:
         raise ValueError("proxy_weight must lie between 0 and 1.")
 
-    base_columns = [
-        column
-        for column in columns
-        if column != proxy_column
-    ]
+    base_columns = [column for column in columns if column != proxy_column]
 
     if not base_columns:
         if proxy_weight != 1:
@@ -212,11 +202,7 @@ def build_weights(
     base_weight = (1 - proxy_weight) / len(base_columns)
 
     return {
-        column: (
-            proxy_weight
-            if column == proxy_column
-            else base_weight
-        )
+        column: (proxy_weight if column == proxy_column else base_weight)
         for column in columns
     }
 
@@ -312,21 +298,16 @@ def build_calliope_cluster_map(
 
     if missing:
         raise ValueError(
-            "TSAM assignments are missing required columns: "
-            f"{sorted(missing)}"
+            f"TSAM assignments are missing required columns: {sorted(missing)}"
         )
 
     periods = (
-        assignments
-        .reset_index(names="timestamp")
+        assignments.reset_index(names="timestamp")
         .groupby("period_idx", sort=True, as_index=False)
         .first()
     )
 
-    periods["date"] = (
-        pd.to_datetime(periods["timestamp"])
-        .dt.normalize()
-    )
+    periods["date"] = pd.to_datetime(periods["timestamp"]).dt.normalize()
 
     if periods["date"].duplicated().any():
         raise ValueError(
@@ -334,15 +315,9 @@ def build_calliope_cluster_map(
             "The current Calliope adapter expects daily typical periods."
         )
 
-    representative_dates = (
-        periods
-        .groupby("cluster_idx", sort=True)["date"]
-        .first()
-    )
+    representative_dates = periods.groupby("cluster_idx", sort=True)["date"].first()
 
-    cluster_map = periods["cluster_idx"].map(
-        representative_dates
-    )
+    cluster_map = periods["cluster_idx"].map(representative_dates)
 
     return pd.Series(
         cluster_map.to_numpy(),
@@ -374,9 +349,7 @@ def prepare_calliope_inputs(
         calliope_timeseries,
     )
 
-    cluster_map = build_calliope_cluster_map(
-        calliope_result
-    )
+    cluster_map = build_calliope_cluster_map(calliope_result)
 
     return (
         cluster_map,
@@ -446,39 +419,25 @@ def _build_representation(
             min_columns=min_columns,
         )
 
-    raise ValueError(
-        f"Unsupported TSAM representation method: {method!r}"
-    )
+    raise ValueError(f"Unsupported TSAM representation method: {method!r}")
 
 
 def _validate_timeseries(data: pd.DataFrame) -> None:
     """Validate assumptions made by the TSA experiment helpers."""
     if not isinstance(data, pd.DataFrame):
-        raise TypeError(
-            "TSAM input data must be a pandas DataFrame."
-        )
+        raise TypeError("TSAM input data must be a pandas DataFrame.")
 
     if data.empty:
-        raise ValueError(
-            "TSAM input data cannot be empty."
-        )
+        raise ValueError("TSAM input data cannot be empty.")
 
     if not isinstance(data.index, pd.DatetimeIndex):
-        raise TypeError(
-            "TSAM input data must use a DatetimeIndex."
-        )
+        raise TypeError("TSAM input data must use a DatetimeIndex.")
 
     if not data.index.is_monotonic_increasing:
-        raise ValueError(
-            "TSAM input timestamps must be monotonically increasing."
-        )
+        raise ValueError("TSAM input timestamps must be monotonically increasing.")
 
     if data.index.has_duplicates:
-        raise ValueError(
-            "TSAM input timestamps must be unique."
-        )
+        raise ValueError("TSAM input timestamps must be unique.")
 
     if data.columns.has_duplicates:
-        raise ValueError(
-            "TSAM input columns must be unique."
-        )
+        raise ValueError("TSAM input columns must be unique.")

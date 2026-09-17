@@ -54,7 +54,9 @@ def read_calliope_timeseries(
     _validate_feature_columns(columns)
 
     n_fields = len(columns) + 1
-    data_rows = [row[:n_fields] for row in rows[timestep_row + 1 :] if row and row[0].strip()]
+    data_rows = [
+        row[:n_fields] for row in rows[timestep_row + 1 :] if row and row[0].strip()
+    ]
 
     if not data_rows:
         raise ValueError(f"No timeseries data found in {Path(path)}.")
@@ -97,7 +99,9 @@ def slice_timeseries(
         raise ValueError("Timeseries start must be earlier than end.")
 
     if start_ts not in data.index:
-        raise ValueError(f"Requested start {start_ts} is not present in the source data.")
+        raise ValueError(
+            f"Requested start {start_ts} is not present in the source data."
+        )
 
     valid_end = end_ts in data.index or end_ts == data.index[-1] + step
     if not valid_end:
@@ -107,7 +111,9 @@ def slice_timeseries(
         )
 
     sliced = data.loc[(data.index >= start_ts) & (data.index < end_ts)].copy()
-    expected_index = pd.date_range(start=start_ts, end=end_ts, freq=step, inclusive="left")
+    expected_index = pd.date_range(
+        start=start_ts, end=end_ts, freq=step, inclusive="left"
+    )
 
     if not sliced.index.equals(expected_index):
         missing = expected_index.difference(sliced.index)
@@ -118,6 +124,55 @@ def slice_timeseries(
         )
 
     return sliced
+
+
+def to_calliope_timeseries_table(
+    data: pd.DataFrame,
+    *,
+    template_path: str | Path,
+) -> pd.DataFrame:
+    """Convert a simple project timeseries to an in-memory Calliope table.
+
+    The source CSV contains metadata rows describing the node, technology, and
+    Calliope input associated with each feature column. Those labels are
+    reapplied as a three-level column index so Calliope can consume the
+    reconstructed TSAM data directly from memory.
+    """
+    _validate_regular_timeseries(data)
+
+    rows = _read_csv_rows(template_path)
+    node_row = _find_marker_row(rows, "nodes")
+    tech_row = _find_marker_row(rows, "techs")
+    parameter_row = _find_marker_row(rows, "parameters")
+
+    nodes = tuple(value.strip() for value in rows[node_row][1:] if value.strip())
+    techs = tuple(value.strip() for value in rows[tech_row][1:] if value.strip())
+    inputs = tuple(value.strip() for value in rows[parameter_row][1:] if value.strip())
+
+    _validate_feature_columns(techs)
+
+    expected_length = len(EXPECTED_FEATURE_COLUMNS)
+    if not (len(nodes) == len(techs) == len(inputs) == expected_length):
+        raise ValueError(
+            "Calliope timeseries metadata do not define one node, technology, "
+            "and input parameter per feature column."
+        )
+
+    missing = set(EXPECTED_FEATURE_COLUMNS) - set(data.columns)
+    extra = set(data.columns) - set(EXPECTED_FEATURE_COLUMNS)
+    if missing or extra:
+        raise ValueError(
+            "Timeseries columns do not match the fixed project feature set. "
+            f"Missing: {sorted(missing)}; extra: {sorted(extra)}"
+        )
+
+    table = data.loc[:, EXPECTED_FEATURE_COLUMNS].copy()
+    table.index = pd.DatetimeIndex(table.index, name="timesteps")
+    table.columns = pd.MultiIndex.from_arrays(
+        [nodes, techs, inputs],
+        names=["nodes", "techs", "inputs"],
+    )
+    return table
 
 
 def write_calliope_timeseries(

@@ -6,12 +6,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import calliope
 import pandas as pd
 from tsam import AggregationResult
 
 from soc_proxy import generate_soc_proxy
 
-from scripts.helpers.timeseries import read_calliope_timeseries
+from scripts.helpers.calliope import run_clustered_calliope
+from scripts.helpers.timeseries import (
+    EXPECTED_FEATURE_COLUMNS,
+    read_calliope_timeseries,
+)
 from scripts.helpers.tsa import (
     build_cluster_config,
     build_weights,
@@ -34,6 +39,14 @@ class TSAArtifacts:
     reconstructed_proxy: pd.DataFrame
 
 
+@dataclass
+class CaseArtifacts:
+    """In-memory outputs from one complete experiment case."""
+
+    tsa: TSAArtifacts
+    calliope_model: calliope.Model
+
+
 def load_case_timeseries(
     config: dict[str, Any],
     source: str | Path,
@@ -51,6 +64,35 @@ def load_case_timeseries(
         source,
         start=data_params["start_date"],
         end=data_params["end_date"],
+    )
+
+
+def run_case(
+    config: dict[str, Any],
+    source_timeseries: str | Path,
+    *,
+    model_path: str | Path = "config/calliope/model.yaml",
+) -> CaseArtifacts:
+    """Run one resolved TSA experiment through to a solved Calliope model.
+
+    TSA outputs remain in memory only. A later result-extraction layer can
+    reduce the solved model to compact outputs before these intermediates are
+    released.
+    """
+    timeseries = load_case_timeseries(config, source_timeseries)
+    tsa = run_tsa_case(config, timeseries)
+
+    model = run_clustered_calliope(
+        config,
+        reconstructed_timeseries=tsa.reconstructed_timeseries,
+        cluster_map=tsa.cluster_map,
+        timeseries_template=source_timeseries,
+        model_path=model_path,
+    )
+
+    return CaseArtifacts(
+        tsa=tsa,
+        calliope_model=model,
     )
 
 
@@ -162,11 +204,10 @@ def _build_clustering_features(
     """Construct the feature matrix passed to TSAM."""
     soc_config = tsa_params["soc_proxy"]
 
-    # Start with the ordinary model timeseries.
-    features = timeseries.copy()
+    base_features = timeseries.loc[:, EXPECTED_FEATURE_COLUMNS].copy()
 
     if not soc_config["enabled"]:
-        return timeseries.copy(), None
+        return base_features, None
 
     proxy_column = soc_config["proxy_field_name"]
     lambda_soc = soc_config["lambda_soc"]
@@ -178,15 +219,14 @@ def _build_clustering_features(
         )
 
     if lambda_soc == 0:
-        return timeseries.copy(), None
+        return base_features, None
 
     if lambda_soc == 1:
         return proxy[[proxy_column]].copy(), proxy_column
 
-    features = timeseries.copy()
-    features[proxy_column] = proxy[proxy_column]
+    base_features[proxy_column] = proxy[proxy_column]
 
-    return features, proxy_column
+    return base_features, proxy_column
 
 
 def _build_tsa_weights(
@@ -201,13 +241,7 @@ def _build_tsa_weights(
 
     lambda_soc = tsa_params["soc_proxy"]["lambda_soc"]
 
-    if lambda_soc == 0:
-        # Equivalent to ordinary TSA.
-        return None
-
-    if lambda_soc == 1:
-        # Feature construction has already reduced the clustering input to the
-        # proxy alone, so TSAM's default equal weighting is sufficient.
+    if lambda_soc in {0, 1}:
         return None
 
     return build_weights(
