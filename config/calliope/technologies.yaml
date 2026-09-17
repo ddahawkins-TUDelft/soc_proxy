@@ -95,7 +95,7 @@ techs:
       data: 0.0000027 # €M / MWh
       index: monetary
       dims: costs
-    cost_flow_in: #variable fuel costs
+    cost_source_use: #variable fuel costs
       data: 0.000004378 # €M / MWh
       index: monetary
       dims: costs
