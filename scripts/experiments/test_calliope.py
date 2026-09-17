@@ -10,4 +10,4 @@ result = run_case(
     model_path="config/calliope/model.yaml",
 )
 
-print(result.model.results)
+print(result.calliope_model.results)
