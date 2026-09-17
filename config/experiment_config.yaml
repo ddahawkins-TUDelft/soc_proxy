@@ -3,8 +3,8 @@ defaults:
 
   data_params:
     country: NL
-    start_year: 2010
-    end_year: 2019
+    start_date: 2010-04-01
+    end_date: 2020-04-01
 
   soc_proxy_params:
     renewable_portfolio_weights:
