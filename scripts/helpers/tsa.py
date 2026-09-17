@@ -376,9 +376,7 @@ def prepare_calliope_inputs(
     clustering_weights = tsa_result.clustering.weights or {}
 
     missing_weight_columns = [
-        column
-        for column in clustering_weights
-        if column not in transfer_data.columns
+        column for column in clustering_weights if column not in transfer_data.columns
     ]
 
     for column in missing_weight_columns:
@@ -402,17 +400,13 @@ def prepare_calliope_inputs(
 
     # Discard clustering-only features. Calliope must receive exactly its
     # original physical timeseries fields.
-    reconstructed_timeseries = (
-        calliope_result.reconstructed[
-            target_columns
-        ]
-        .copy()
-    )
+    reconstructed_timeseries = calliope_result.reconstructed[target_columns].copy()
 
     return (
         cluster_map,
         reconstructed_timeseries,
     )
+
 
 def _build_representation(
     representation_params: dict[str, Any] | None,

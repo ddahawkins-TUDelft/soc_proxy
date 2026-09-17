@@ -10,9 +10,7 @@ import pandas as pd
 import xarray as xr
 
 
-DEFAULT_REFERENCE_DIR = Path(
-    "resources/calliope_models/reference"
-)
+DEFAULT_REFERENCE_DIR = Path("resources/calliope_models/reference")
 
 
 @dataclass(frozen=True)
@@ -41,26 +39,15 @@ def resolve_reference_model_path(
     """Find the calendar-year reference corresponding to one experiment."""
     data_params = config["data_params"]
 
-    start = pd.Timestamp(
-        data_params["start_date"]
-    )
-    end = pd.Timestamp(
-        data_params["end_date"]
-    )
+    start = pd.Timestamp(data_params["start_date"])
+    end = pd.Timestamp(data_params["end_date"])
 
     country = data_params["country"]
 
     if end <= start:
-        raise ValueError(
-            "end_date must be later than start_date."
-        )
+        raise ValueError("end_date must be later than start_date.")
 
-    if not (
-        start.month == 1
-        and start.day == 1
-        and end.month == 1
-        and end.day == 1
-    ):
+    if not (start.month == 1 and start.day == 1 and end.month == 1 and end.day == 1):
         raise ValueError(
             "Existing reference models represent complete calendar-year "
             "horizons. No matching historical reference can be inferred for "
@@ -70,17 +57,12 @@ def resolve_reference_model_path(
     start_year = start.year
     end_year = end.year - 1
 
-    filename = (
-        f"standard_{start_year}_{end_year}"
-        f"_reference_{country}.nc"
-    )
+    filename = f"standard_{start_year}_{end_year}_reference_{country}.nc"
 
     path = Path(reference_dir) / filename
 
     if not path.is_file():
-        raise FileNotFoundError(
-            f"Expected reference model does not exist: {path}"
-        )
+        raise FileNotFoundError(f"Expected reference model does not exist: {path}")
 
     return path
 
@@ -115,9 +97,7 @@ def load_reference_model(
         ) from error
 
     if not results.data_vars:
-        raise RuntimeError(
-            f"Reference model contains no solved results: {path}"
-        )
+        raise RuntimeError(f"Reference model contains no solved results: {path}")
 
     return ReferenceModel(
         path=path,
