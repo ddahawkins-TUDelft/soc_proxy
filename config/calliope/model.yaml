@@ -22,6 +22,7 @@ config:
     ensure_feasibility: false # Switches on the "unmet demand" constraint 
   solve:
     solver: gurobi
+    solver_io: python
     zero_threshold: 1e-10 # Any value coming out of the backend that is smaller than this (due to floating point errors, probably) will be set to zero
     shadow_prices: [
       # "storage_max", # shadow price of energy capacity i.e. increasing storage cap, usually only >0 for 1 time step

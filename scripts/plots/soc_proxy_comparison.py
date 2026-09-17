@@ -136,9 +136,9 @@ def plot_soc_proxy_comparison(
     ax.plot(
         reference_proxy.index,
         reference_proxy,
-        color=colors[1],
+        color=colors[0],
         linewidth=1.2,
-        linestyle="--",
+        linestyle=":",
         label="Reference SoC Proxy",
     )
 
@@ -155,7 +155,7 @@ def plot_soc_proxy_comparison(
         ax.plot(
             clustered_proxy.index,
             clustered_proxy,
-            color=colors[3],
+            color=colors[2],
             linewidth=1.2,
             linestyle="--",
             label="Clustered SoC Proxy",
