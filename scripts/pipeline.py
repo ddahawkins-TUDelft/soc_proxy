@@ -221,25 +221,10 @@ def _generate_proxy(
     timeseries: pd.DataFrame,
     params: dict[str, Any],
 ) -> pd.DataFrame:
-    """Generate proxy fields from one chronological timeseries.
-
-    This adapter is intentionally isolated because the public
-    ``generate_soc_proxy`` API is the next component we intend to clean up.
-    """
-    if "economic_modifier_m" in params:
-        raise NotImplementedError(
-            "The rebuilt experiment config defines 'economic_modifier_m', "
-            "but generate_soc_proxy() does not yet implement that parameter. "
-            "Implement its intended semantics before running experiments so "
-            "the configured value cannot be silently ignored."
-        )
-
+    """Generate SoC-proxy fields from a chronological timeseries."""
     result, _, _ = generate_soc_proxy(
         df=timeseries,
-        renewables_fields_and_weights=params[
-            "renewable_portfolio_weights"
-        ],
-        soc_decomposition=params["temporal_decomposition"],
+        **params,
     )
 
     return result

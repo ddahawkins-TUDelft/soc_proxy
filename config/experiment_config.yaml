@@ -7,16 +7,17 @@ defaults:
     end_date: 2020-04-01
 
   soc_proxy_params:
-    renewable_portfolio_weights:
+    renewables_fields_and_weights:
       solar: 2
       onshore_wind: 1
       offshore_wind: 1
 
-    economic_modifier_m: 0.4
-
-    temporal_decomposition:
+    soc_decomposition:
       method: fft_lowpass
       time_horizon_hours: 24
+
+    margin_mode: fixed
+    margin_value: 0.04
 
   tsa_params:
     k_periods: 30
