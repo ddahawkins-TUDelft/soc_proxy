@@ -189,7 +189,7 @@ def run_clustered_calliope(
 
     termination_condition = _get_termination_condition(model)
 
-    if termination_condition not in {"optimal", "feasible"}:
+    if termination_condition != "optimal":
         raise RuntimeError(
             "Calliope solve did not terminate successfully. "
             f"Termination condition: {termination_condition!r}"

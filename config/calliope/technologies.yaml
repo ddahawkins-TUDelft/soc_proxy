@@ -117,7 +117,7 @@ techs:
     base_tech: storage
     carrier_in: power
     carrier_out: power
-    storage_cap_max: 1000000 #selected arbitrarily to improve solver time, historic runs have not come close to this value
+    # storage_cap_max: 10000 #selected arbitrarily to improve solver time, historic runs have not come close to this value
     flow_cap_per_storage_cap_max: 3 #power to energy ratio, set to 3
     flow_out_eff: 0.97
     flow_in_eff: 0.98

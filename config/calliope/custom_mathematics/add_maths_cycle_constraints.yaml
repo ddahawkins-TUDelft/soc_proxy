@@ -22,11 +22,11 @@ constraints:
     where: capacity_factor_min
     equations:
       - expression: >
-          sum(flow_out * timestep_weights, over=timesteps) >=
-          flow_cap * capacity_factor_min * $total_time
+          sum(flow_out * timestep_weights, over=timesteps) / $total_time >= flow_cap * capacity_factor_min
     sub_expressions:
-      total_time: &total_time
-        - expression: sum(timestep_resolution * timestep_weights, over=timesteps) 
+      total_time:
+        - expression: >
+            sum(timestep_resolution * timestep_weights, over=timesteps)
 
 #
 #          Global Expressions
