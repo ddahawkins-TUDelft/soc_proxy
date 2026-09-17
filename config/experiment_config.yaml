@@ -50,20 +50,37 @@ defaults:
 
 experiments:
 
-  baseline:
-    {}
+  smoke_no_proxy:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2010-03-01
 
-  no_proxy:
     tsa_params:
+      k_periods: 5
+
       soc_proxy:
         enabled: false
 
-  kmeans:
-    tsa_params:
       cluster:
         method: kmeans
 
-  kmedoids_lambda_025:
+      representation:
+        method: medoid
+
+  smoke_proxy:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2010-03-01
+
     tsa_params:
+      k_periods: 5
+
       soc_proxy:
-        lambda_soc: 0.25
+        enabled: true
+        lambda_soc: 0.5
+
+      cluster:
+        method: kmeans
+
+      representation:
+        method: medoid
