@@ -10,7 +10,20 @@ import xarray as xr
 
 
 class ModelData(Protocol):
+    """Solved model data required for cost extraction."""
+
     results: xr.Dataset
+
+
+COST_COLUMNS = [
+    "case_id",
+    "model_type",
+    "node",
+    "tech",
+    "cost_class",
+    "value",
+    "unannualised_value",
+]
 
 
 def extract_costs(
@@ -21,62 +34,74 @@ def extract_costs(
 ) -> pd.DataFrame:
     """Extract CAPEX and OPEX by technology in long format.
 
-    The returned rows are additive: summing ``value`` for one
-    ``case_id``/``model_type`` yields total system cost.
+    ``value`` contains the additive cost values used to reproduce Calliope's
+    total model cost:
+
+    - CAPEX: annualised investment cost
+    - OPEX: fixed + variable operating cost
+
+    ``unannualised_value`` contains the underlying investment cost for CAPEX
+    rows and is missing for OPEX rows.
+
+    Therefore:
+
+        costs["value"].sum()
+
+    reproduces Calliope's total technology cost, while raw investment remains
+    available separately for alternative weighting and reporting.
     """
-    if model_type not in {"reference", "clustered"}:
-        raise ValueError("model_type must be 'reference' or 'clustered'.")
+    _validate_model_type(model_type)
 
     required = {
+        "cost",
+        "cost_investment",
         "cost_investment_annualised",
         "cost_operation_fixed",
         "cost_operation_variable",
-        "cost",
     }
 
     missing = required.difference(model.results.data_vars)
 
     if missing:
         raise RuntimeError(
-            f"Required Calliope cost results are unavailable: {sorted(missing)}"
+            "Required Calliope cost results are unavailable: "
+            f"{sorted(missing)}"
         )
 
-    capex = _monetary(model.results["cost_investment_annualised"])
+    annualised_capex = _monetary(
+        model.results["cost_investment_annualised"]
+    )
 
-    fixed_opex = _monetary(model.results["cost_operation_fixed"])
+    unannualised_capex = _monetary(
+        model.results["cost_investment"]
+    )
 
-    variable = _monetary(model.results["cost_operation_variable"])
+    fixed_opex = _monetary(
+        model.results["cost_operation_fixed"]
+    )
 
-    variable_present = variable.notnull().any(dim="timesteps")
+    variable_opex = _aggregate_variable_opex(
+        _monetary(
+            model.results["cost_operation_variable"]
+        )
+    )
 
-    variable_opex = variable.fillna(0).sum(dim="timesteps").where(variable_present)
+    capex = _capex_frame(
+        annualised_capex,
+        unannualised_capex,
+        case_id=case_id,
+        model_type=model_type,
+    )
 
-    fixed_opex, variable_opex = xr.align(
+    opex = _opex_frame(
         fixed_opex,
         variable_opex,
-        join="outer",
-    )
-
-    opex_present = fixed_opex.notnull() | variable_opex.notnull()
-
-    opex = (fixed_opex.fillna(0) + variable_opex.fillna(0)).where(opex_present)
-
-    capex_frame = _cost_frame(
-        capex,
         case_id=case_id,
         model_type=model_type,
-        cost_class="capex",
-    )
-
-    opex_frame = _cost_frame(
-        opex,
-        case_id=case_id,
-        model_type=model_type,
-        cost_class="opex",
     )
 
     costs = pd.concat(
-        [capex_frame, opex_frame],
+        [capex, opex],
         ignore_index=True,
     )
 
@@ -88,63 +113,156 @@ def extract_costs(
     return costs
 
 
-def _monetary(
+def _aggregate_variable_opex(
     data: xr.DataArray,
 ) -> xr.DataArray:
-    """Select the single monetary cost class."""
-    if "costs" not in data.dims:
+    """Sum already-weighted variable OPEX across representative timesteps."""
+    if "timesteps" not in data.dims:
         return data
 
-    available = [str(value) for value in data["costs"].values]
+    present = data.notnull().any(
+        dim="timesteps"
+    )
 
-    if available != ["monetary"]:
-        raise RuntimeError(
-            "This extraction currently assumes the model has exactly "
-            f"one monetary cost class. Found: {available}"
-        )
+    return (
+        data
+        .fillna(0)
+        .sum(dim="timesteps")
+        .where(present)
+    )
 
-    return data.sel(costs="monetary", drop=True)
 
-
-def _cost_frame(
-    data: xr.DataArray,
+def _capex_frame(
+    annualised: xr.DataArray,
+    unannualised: xr.DataArray,
     *,
     case_id: str,
     model_type: str,
-    cost_class: str,
 ) -> pd.DataFrame:
-    frame = data.to_series().dropna().rename("value").reset_index()
+    """Build CAPEX rows containing both investment representations."""
+    annualised, unannualised = xr.align(
+        annualised,
+        unannualised,
+        join="outer",
+    )
+
+    annualised_series = (
+        annualised
+        .to_series()
+        .rename("value")
+    )
+
+    unannualised_series = (
+        unannualised
+        .to_series()
+        .rename("unannualised_value")
+    )
+
+    frame = pd.concat(
+        [
+            annualised_series,
+            unannualised_series,
+        ],
+        axis=1,
+    ).reset_index()
+
+    # Drop technologies for which neither investment representation exists.
+    frame = frame.dropna(
+        subset=[
+            "value",
+            "unannualised_value",
+        ],
+        how="all",
+    )
 
     if frame.empty:
-        return pd.DataFrame(
-            columns=[
-                "case_id",
-                "model_type",
-                "node",
-                "tech",
-                "cost_class",
-                "value",
-            ]
-        )
+        return _empty_cost_frame()
 
     frame["case_id"] = case_id
     frame["model_type"] = model_type
-    frame["cost_class"] = cost_class
+    frame["cost_class"] = "capex"
 
-    return frame[
-        [
-            "case_id",
-            "model_type",
-            "nodes",
-            "techs",
-            "cost_class",
-            "value",
-        ]
-    ].rename(
+    return _format_cost_frame(frame)
+
+
+def _opex_frame(
+    fixed: xr.DataArray,
+    variable: xr.DataArray,
+    *,
+    case_id: str,
+    model_type: str,
+) -> pd.DataFrame:
+    """Build additive OPEX rows from fixed and variable operating costs."""
+    fixed, variable = xr.align(
+        fixed,
+        variable,
+        join="outer",
+    )
+
+    present = (
+        fixed.notnull()
+        | variable.notnull()
+    )
+
+    total = (
+        fixed.fillna(0)
+        + variable.fillna(0)
+    ).where(present)
+
+    frame = (
+        total
+        .to_series()
+        .dropna()
+        .rename("value")
+        .reset_index()
+    )
+
+    if frame.empty:
+        return _empty_cost_frame()
+
+    frame["case_id"] = case_id
+    frame["model_type"] = model_type
+    frame["cost_class"] = "opex"
+    frame["unannualised_value"] = np.nan
+
+    return _format_cost_frame(frame)
+
+
+def _format_cost_frame(
+    frame: pd.DataFrame,
+) -> pd.DataFrame:
+    """Standardise cost table column names and ordering."""
+    frame = frame.rename(
         columns={
             "nodes": "node",
             "techs": "tech",
         }
+    )
+
+    return frame[COST_COLUMNS]
+
+
+def _monetary(
+    data: xr.DataArray,
+) -> xr.DataArray:
+    """Select the single monetary cost class used by this model."""
+    if "costs" not in data.dims:
+        return data
+
+    available = [
+        str(value)
+        for value in data["costs"].values
+    ]
+
+    if available != ["monetary"]:
+        raise RuntimeError(
+            "Cost extraction currently assumes exactly one cost class "
+            f"named 'monetary'. Found: {available}"
+        )
+
+    return data.sel(
+        costs="monetary",
+        drop=True,
     )
 
 
@@ -152,12 +270,18 @@ def _validate_cost_total(
     model: ModelData,
     costs: pd.DataFrame,
 ) -> None:
-    """Check that extracted rows reproduce Calliope total cost."""
-    extracted_total = float(costs["value"].sum())
+    """Check that additive extracted costs reproduce Calliope's total cost."""
+    extracted_total = float(
+        costs["value"].sum()
+    )
 
-    calliope_cost = _monetary(model.results["cost"])
-
-    calliope_total = float(calliope_cost.sum(skipna=True).item())
+    calliope_total = float(
+        _monetary(
+            model.results["cost"]
+        )
+        .sum(skipna=True)
+        .item()
+    )
 
     if not np.isclose(
         extracted_total,
@@ -166,17 +290,18 @@ def _validate_cost_total(
         atol=1e-6,
     ):
         raise RuntimeError(
-            "Extracted CAPEX/OPEX does not reproduce Calliope's "
-            "technology cost total. "
+            "Extracted CAPEX/OPEX does not reproduce Calliope's total "
+            "technology cost. "
             f"Extracted={extracted_total:.12g}, "
             f"Calliope={calliope_total:.12g}."
         )
 
-    # In this model, monetary cost has weight 1 and there should be no
-    # unmet-demand penalty, so total technology cost should also equal
-    # the optimisation objective.
     if "min_cost_optimisation" in model.results:
-        objective = float(model.results["min_cost_optimisation"].item())
+        objective = float(
+            model.results[
+                "min_cost_optimisation"
+            ].item()
+        )
 
         if not np.isclose(
             calliope_total,
@@ -185,9 +310,27 @@ def _validate_cost_total(
             atol=1e-6,
         ):
             raise RuntimeError(
-                "Calliope technology costs do not reproduce the "
-                "optimisation objective. This may indicate an unexpected "
-                "objective penalty or cost term. "
+                "Calliope technology costs do not reproduce the optimisation "
+                "objective. This may indicate an additional objective term or "
+                "penalty. "
                 f"Costs={calliope_total:.12g}, "
                 f"objective={objective:.12g}."
             )
+
+
+def _validate_model_type(
+    model_type: str,
+) -> None:
+    if model_type not in {
+        "reference",
+        "clustered",
+    }:
+        raise ValueError(
+            "model_type must be 'reference' or 'clustered'."
+        )
+
+
+def _empty_cost_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=COST_COLUMNS
+    )

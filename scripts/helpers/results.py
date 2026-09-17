@@ -21,6 +21,9 @@ from scripts.helpers.results_costs import (
 from scripts.helpers.results_parameters import (
     extract_parameters,
 )
+from scripts.helpers.results_investment_metrics import (
+    calculate_investment_metrics,
+)
 
 
 _CASE_CONFIG_KEYS = (
@@ -40,6 +43,7 @@ class CaseResults:
     parameters: pd.DataFrame
     capacities: pd.DataFrame
     costs: pd.DataFrame
+    investment_metrics: pd.DataFrame
 
 
 def generate_case_id(
@@ -112,11 +116,17 @@ def extract_case_results(
         ignore_index=True,
     )
 
+    investment_metrics = calculate_investment_metrics(
+    capacities,
+    costs,
+)
+
     return CaseResults(
         case_id=case_id,
         parameters=parameters,
         capacities=capacities,
         costs=costs,
+        investment_metrics=investment_metrics,
     )
 
 
@@ -157,6 +167,11 @@ def record_case_results(
         root / "costs" / f"{results.case_id}.parquet",
     )
 
+    _write_fragment(
+        results.investment_metrics,
+        root / "investment_metrics" / f"{results.case_id}.parquet",
+    )
+
     return results.case_id
 
 
@@ -171,6 +186,7 @@ def consolidate_results(
         "parameters",
         "capacities",
         "costs",
+        "investment_metrics",
     ):
         source = root / "_fragments" / table
         paths = sorted(source.glob("*.parquet"))
