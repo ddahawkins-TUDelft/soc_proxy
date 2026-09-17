@@ -3,8 +3,8 @@ defaults:
 
   data_params:
     country: NL
-    start_date: 2010-04-01
-    end_date: 2020-04-01
+    start_date: 2010-01-01
+    end_date: 2020-01-01
 
   soc_proxy_params:
     renewables_fields_and_weights:

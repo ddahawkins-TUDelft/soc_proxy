@@ -101,9 +101,7 @@ def build_clustered_model(
     user_overrides = calliope_params.get("overrides", {})
 
     if not isinstance(user_overrides, dict):
-        raise TypeError(
-            "calliope_params.overrides must be a mapping."
-        )
+        raise TypeError("calliope_params.overrides must be a mapping.")
 
     # Start with user-defined experimental overrides, then force the temporal
     # plumbing required by this experiment. This prevents an unrelated
@@ -115,21 +113,15 @@ def build_clustered_model(
             "config.init.subset.timesteps": None,
             "config.init.time_cluster": _CLUSTER_INPUT,
             "config.init.extra_math": _cluster_extra_math(model_path),
-
-            "data_tables.time_varying_parameters.table":
-                _TIMESERIES_TABLE,
-            "data_tables.time_varying_parameters.rows":
-                "timesteps",
+            "data_tables.time_varying_parameters.table": _TIMESERIES_TABLE,
+            "data_tables.time_varying_parameters.rows": "timesteps",
             "data_tables.time_varying_parameters.columns": [
                 "nodes",
                 "techs",
                 "inputs",
             ],
-            "data_tables.time_varying_parameters.drop":
-                None,
-            "data_tables.time_varying_parameters.rename_dims":
-                None,
-
+            "data_tables.time_varying_parameters.drop": None,
+            "data_tables.time_varying_parameters.rename_dims": None,
             "data_tables.cluster_days": {
                 "table": _CLUSTER_TABLE,
                 "rows": "timesteps",
@@ -204,9 +196,7 @@ def run_clustered_calliope(
         )
 
     if model.results is None or not model.results.data_vars:
-        raise RuntimeError(
-            "Calliope solve completed without model results."
-        )
+        raise RuntimeError("Calliope solve completed without model results.")
 
     return model
 
@@ -229,23 +219,19 @@ def validate_clustered_model_inputs(
     values reconstructed independently from ``cluster_map``.
     """
     if "timesteps" not in model.inputs.coords:
-        raise RuntimeError(
-            "Calliope preprocessing removed the timesteps dimension."
-        )
+        raise RuntimeError("Calliope preprocessing removed the timesteps dimension.")
 
     model_timesteps = pd.DatetimeIndex(
         model.inputs.coords["timesteps"].values,
         name="timesteps",
     )
 
-    representative_dates = pd.DatetimeIndex(
-        pd.to_datetime(cluster_map.unique())
-    ).normalize().sort_values()
+    representative_dates = (
+        pd.DatetimeIndex(pd.to_datetime(cluster_map.unique())).normalize().sort_values()
+    )
 
     expected_timesteps = reconstructed_timeseries.index[
-        reconstructed_timeseries.index
-        .normalize()
-        .isin(representative_dates)
+        reconstructed_timeseries.index.normalize().isin(representative_dates)
     ]
 
     if not model_timesteps.equals(expected_timesteps):
@@ -302,8 +288,7 @@ def _validate_loaded_timeseries_values(
 
         if input_name not in model.inputs:
             raise RuntimeError(
-                f"Calliope dropped input {input_name!r} supplied for "
-                f"{node!r}/{tech!r}."
+                f"Calliope dropped input {input_name!r} supplied for {node!r}/{tech!r}."
             )
 
         if tech not in reconstructed_timeseries.columns:
@@ -373,9 +358,7 @@ def _validate_cluster_structure(
     model_timesteps: pd.DatetimeIndex,
 ) -> None:
     """Validate Calliope's cluster weights and lookup arrays."""
-    original_dates = pd.DatetimeIndex(
-        cluster_map.index
-    ).normalize()
+    original_dates = pd.DatetimeIndex(cluster_map.index).normalize()
 
     representative_dates = pd.Series(
         pd.to_datetime(cluster_map.to_numpy()).normalize(),
@@ -392,9 +375,7 @@ def _validate_cluster_structure(
             "Calliope clustering did not create the datesteps dimension."
         )
 
-    loaded_datesteps = pd.DatetimeIndex(
-        model.inputs.coords["datesteps"].values
-    )
+    loaded_datesteps = pd.DatetimeIndex(model.inputs.coords["datesteps"].values)
 
     if not loaded_datesteps.equals(original_dates):
         raise RuntimeError(
@@ -406,16 +387,12 @@ def _validate_cluster_structure(
     # ------------------------------------------------------------------
 
     expected_datestep_clusters = (
-        representative_dates
-        .groupby(representative_dates)
-        .ngroup()
-        .astype(int)
+        representative_dates.groupby(representative_dates).ngroup().astype(int)
     )
 
     if "lookup_datestep_cluster" not in model.inputs:
         raise RuntimeError(
-            "Calliope clustering did not create "
-            "'lookup_datestep_cluster'."
+            "Calliope clustering did not create 'lookup_datestep_cluster'."
         )
 
     loaded_datestep_clusters = (
@@ -434,16 +411,12 @@ def _validate_cluster_structure(
             "supplied representative-day mapping."
         )
 
-    cluster_id_by_rep_date = (
-        expected_datestep_clusters
-        .groupby(representative_dates)
-        .first()
-    )
+    cluster_id_by_rep_date = expected_datestep_clusters.groupby(
+        representative_dates
+    ).first()
 
     if "timestep_cluster" not in model.inputs:
-        raise RuntimeError(
-            "Calliope clustering did not create 'timestep_cluster'."
-        )
+        raise RuntimeError("Calliope clustering did not create 'timestep_cluster'.")
 
     expected_timestep_clusters = (
         pd.Series(
@@ -476,9 +449,7 @@ def _validate_cluster_structure(
     # ------------------------------------------------------------------
 
     if "timestep_weights" not in model.inputs:
-        raise RuntimeError(
-            "Calliope clustering did not create 'timestep_weights'."
-        )
+        raise RuntimeError("Calliope clustering did not create 'timestep_weights'.")
 
     expected_counts = representative_dates.value_counts()
 
@@ -505,9 +476,7 @@ def _validate_cluster_structure(
     )
 
     if "clusters" not in model.inputs.coords:
-        raise RuntimeError(
-            "Calliope clustering did not create the clusters dimension."
-        )
+        raise RuntimeError("Calliope clustering did not create the clusters dimension.")
 
     n_loaded_clusters = model.inputs.coords["clusters"].size
     n_expected_clusters = representative_dates.nunique()
@@ -528,18 +497,14 @@ def _validate_in_memory_tables(
     cluster_table: pd.DataFrame,
 ) -> None:
     """Validate the two pandas objects before passing them to Calliope."""
-    if not timeseries_table.index.equals(
-        reconstructed_timeseries.index
-    ):
+    if not timeseries_table.index.equals(reconstructed_timeseries.index):
         raise RuntimeError(
             "Calliope timeseries-table index differs from the reconstructed "
             "TSAM timeseries."
         )
 
     if not isinstance(timeseries_table.columns, pd.MultiIndex):
-        raise RuntimeError(
-            "Calliope timeseries table must have MultiIndex columns."
-        )
+        raise RuntimeError("Calliope timeseries table must have MultiIndex columns.")
 
     if list(timeseries_table.columns.names) != [
         "nodes",
@@ -552,11 +517,15 @@ def _validate_in_memory_tables(
 
     for _, tech, _ in timeseries_table.columns:
         expected = reconstructed_timeseries[tech].to_numpy(dtype=float)
-        actual = timeseries_table.xs(
-            tech,
-            axis=1,
-            level="techs",
-        ).iloc[:, 0].to_numpy(dtype=float)
+        actual = (
+            timeseries_table.xs(
+                tech,
+                axis=1,
+                level="techs",
+            )
+            .iloc[:, 0]
+            .to_numpy(dtype=float)
+        )
 
         _assert_numeric_equal(
             label=f"in-memory timeseries table: {tech}",
@@ -571,29 +540,21 @@ def _validate_in_memory_tables(
 
     if not cluster_table.index.equals(expected_cluster_index):
         raise RuntimeError(
-            "In-memory Calliope cluster table index differs from "
-            "the TSAM cluster map."
+            "In-memory Calliope cluster table index differs from the TSAM cluster map."
         )
 
     expected_cluster_values = (
-        pd.to_datetime(cluster_map)
-        .dt.strftime("%Y-%m-%d")
-        .to_numpy()
+        pd.to_datetime(cluster_map).dt.strftime("%Y-%m-%d").to_numpy()
     )
 
-    actual_cluster_values = (
-        cluster_table.iloc[:, 0]
-        .astype(str)
-        .to_numpy()
-    )
+    actual_cluster_values = cluster_table.iloc[:, 0].astype(str).to_numpy()
 
     if not np.array_equal(
         actual_cluster_values,
         expected_cluster_values,
     ):
         raise RuntimeError(
-            "In-memory Calliope cluster table values differ from "
-            "the TSAM cluster map."
+            "In-memory Calliope cluster table values differ from the TSAM cluster map."
         )
 
 
@@ -610,56 +571,35 @@ def _cluster_map_to_table(
     in-memory datetime-valued data table into its numeric model dataset.
     """
     if not isinstance(cluster_map, pd.Series):
-        raise TypeError(
-            "cluster_map must be a pandas Series."
-        )
+        raise TypeError("cluster_map must be a pandas Series.")
 
     if cluster_map.empty:
-        raise ValueError(
-            "cluster_map cannot be empty."
-        )
+        raise ValueError("cluster_map cannot be empty.")
 
     if not isinstance(cluster_map.index, pd.DatetimeIndex):
-        raise TypeError(
-            "cluster_map must use a DatetimeIndex."
-        )
+        raise TypeError("cluster_map must use a DatetimeIndex.")
 
     if cluster_map.index.has_duplicates:
-        raise ValueError(
-            "cluster_map dates must be unique."
-        )
+        raise ValueError("cluster_map dates must be unique.")
 
     if cluster_map.isna().any():
-        raise ValueError(
-            "cluster_map cannot contain missing representative dates."
-        )
+        raise ValueError("cluster_map cannot contain missing representative dates.")
 
-    original_dates = pd.DatetimeIndex(
-        cluster_map.index
-    )
+    original_dates = pd.DatetimeIndex(cluster_map.index)
 
-    representative_dates = pd.DatetimeIndex(
-        pd.to_datetime(cluster_map, errors="raise")
-    )
+    representative_dates = pd.DatetimeIndex(pd.to_datetime(cluster_map, errors="raise"))
 
     if not original_dates.equals(original_dates.normalize()):
-        raise ValueError(
-            "cluster_map index must contain dates at midnight."
-        )
+        raise ValueError("cluster_map index must contain dates at midnight.")
 
-    if not representative_dates.equals(
-        representative_dates.normalize()
-    ):
+    if not representative_dates.equals(representative_dates.normalize()):
         raise ValueError(
-            "cluster_map representative values must contain dates at "
-            "midnight."
+            "cluster_map representative values must contain dates at midnight."
         )
 
     original_date_set = set(original_dates)
 
-    unknown_representatives = (
-        set(representative_dates) - original_date_set
-    )
+    unknown_representatives = set(representative_dates) - original_date_set
 
     if unknown_representatives:
         raise ValueError(
@@ -669,12 +609,7 @@ def _cluster_map_to_table(
         )
 
     frame = pd.DataFrame(
-        {
-            "cluster_days": (
-                representative_dates
-                .strftime("%Y-%m-%d")
-            )
-        },
+        {"cluster_days": (representative_dates.strftime("%Y-%m-%d"))},
         index=pd.DatetimeIndex(
             original_dates,
             name="timesteps",
@@ -695,16 +630,11 @@ def _cluster_extra_math(
         model_definition = yaml.safe_load(file) or {}
 
     extra_math = (
-        model_definition
-        .get("config", {})
-        .get("init", {})
-        .get("extra_math", [])
+        model_definition.get("config", {}).get("init", {}).get("extra_math", [])
     ) or []
 
     if not isinstance(extra_math, list):
-        raise TypeError(
-            "config.init.extra_math in the Calliope model must be a list."
-        )
+        raise TypeError("config.init.extra_math in the Calliope model must be a list.")
 
     return list(
         dict.fromkeys(
@@ -764,9 +694,7 @@ def _get_termination_condition(
             return str(termination)
 
         try:
-            termination = runtime.get(
-                "termination_condition"
-            )
+            termination = runtime.get("termination_condition")
         except AttributeError:
             termination = None
 
@@ -774,9 +702,7 @@ def _get_termination_condition(
             return str(termination)
 
     if model.results is not None:
-        termination = model.results.attrs.get(
-            "termination_condition"
-        )
+        termination = model.results.attrs.get("termination_condition")
 
         if termination is not None:
             return str(termination)
