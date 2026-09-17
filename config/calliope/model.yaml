@@ -10,11 +10,11 @@ config:
   init:
     name: Netherlands_Simple_Weather_Year_Model
     # What version of Calliope this model is intended for
+    calliope_version: 0.7.0
     mode: base # Choices: base, operate
-    subset.timesteps: ["2010-01-01", "2010-12-31"] # Subset of timesteps
     broadcast_input_data: true  # allow single indexed parameter data entries to be broadcast across all index items, if there are multiple entries.
     math_paths: 
-      maths_cyclic_constraints: "../custom_mathematics/add_maths_cycle_constraints.yaml"
+      maths_cyclic_constraints: "custom_mathematics/add_maths_cycle_constraints.yaml"
     extra_math: [maths_cyclic_constraints]
         
 
@@ -47,9 +47,11 @@ data_definitions:
 
 data_tables:
   time_varying_parameters:
-    data: ../data_tables/full_horizon/time_varying_parameters.csv
+    table: ../data_tables/full_horizon/time_varying_parameters.csv
     rows: timesteps
     columns: [comment, nodes, techs, parameters]
     drop: comment
+    rename_dims:
+      parameters: inputs
   
 

@@ -13,6 +13,7 @@ from typing import Any
 
 import calliope
 import pandas as pd
+import yaml
 
 from scripts.helpers.timeseries import to_calliope_timeseries_table
 
@@ -20,6 +21,7 @@ from scripts.helpers.timeseries import to_calliope_timeseries_table
 _CLUSTER_INPUT = "cluster_days_param"
 _TIMESERIES_TABLE = "time_varying_parameters_df"
 _CLUSTER_TABLE = "cluster_days_df"
+_STORAGE_CLUSTER_MATH = "storage_inter_cluster"
 
 
 def build_clustered_model(
@@ -69,22 +71,29 @@ def build_clustered_model(
     )
     cluster_table = _cluster_map_to_table(cluster_map)
 
+    # The experiment pipeline has already applied its exact half-open
+    # [start_date, end_date) horizon, so the base model must not subset the
+    # in-memory data again. The base time-series table is also adapted from
+    # its file representation (which uses a ``parameters`` metadata row) to
+    # the current Calliope ``inputs`` dimension used by the in-memory table.
     overrides: dict[str, Any] = {
-        "data_tables.time_varying_parameters": {
-            "table": _TIMESERIES_TABLE,
-            "rows": "timesteps",
-            "columns": ["nodes", "techs", "inputs"],
-        },
+        "config.init.subset.timesteps": None,
+        "config.init.time_cluster": _CLUSTER_INPUT,
+        "config.init.extra_math": _cluster_extra_math(model_path),
+        "data_tables.time_varying_parameters.table": _TIMESERIES_TABLE,
+        "data_tables.time_varying_parameters.rows": "timesteps",
+        "data_tables.time_varying_parameters.columns": [
+            "nodes",
+            "techs",
+            "inputs",
+        ],
+        "data_tables.time_varying_parameters.drop": None,
+        "data_tables.time_varying_parameters.rename_dims": None,
         "data_tables.cluster_days": {
             "table": _CLUSTER_TABLE,
             "rows": "timesteps",
             "add_dims": {"inputs": _CLUSTER_INPUT},
         },
-        "config.init.time_cluster": _CLUSTER_INPUT,
-        # Calliope's built-in inter-cluster storage formulation tracks storage
-        # across the chronology of representative days and handles cyclic
-        # storage without the legacy custom-math workaround.
-        "config.init.extra_math": ["storage_inter_cluster"],
     }
 
     solver = solver_params.get("solver")
@@ -99,8 +108,9 @@ def build_clustered_model(
     if solver_options is not None:
         overrides["config.solve.solver_options"] = solver_options
 
-    # Explicit Calliope overrides are useful for reviewer experiments without
-    # requiring the runner to understand every Calliope configuration option.
+    # Explicit Calliope overrides remain available for experiments that need
+    # to vary model inputs/configuration without teaching this helper about
+    # each individual Calliope option.
     user_overrides = calliope_params.get("overrides", {})
     if not isinstance(user_overrides, dict):
         raise TypeError("calliope_params.overrides must be a mapping.")
@@ -141,6 +151,26 @@ def run_clustered_calliope(
         raise RuntimeError("Calliope solve completed without model results.")
 
     return model
+
+
+def _cluster_extra_math(model_path: Path) -> list[str]:
+    """Preserve base-model extra math and add inter-cluster storage math."""
+    with model_path.open("r", encoding="utf-8") as file:
+        model_definition = yaml.safe_load(file) or {}
+
+    extra_math = (
+        model_definition
+        .get("config", {})
+        .get("init", {})
+        .get("extra_math", [])
+    ) or []
+
+    if not isinstance(extra_math, list):
+        raise TypeError(
+            "config.init.extra_math in the Calliope model must be a list."
+        )
+
+    return list(dict.fromkeys([*extra_math, _STORAGE_CLUSTER_MATH]))
 
 
 def _cluster_map_to_table(cluster_map: pd.Series) -> pd.DataFrame:
