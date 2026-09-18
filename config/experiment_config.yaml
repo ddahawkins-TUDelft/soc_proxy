@@ -7,17 +7,51 @@ defaults:
     end_date: 2020-01-01
 
   soc_proxy_params:
-    renewables_fields_and_weights:
-      solar: 2
-      onshore_wind: 1
-      offshore_wind: 1
+    demand_field: demand_power
+    dispatchable_capacity: 3300
+
+    # Renewable keys are input-data columns. Costs are annualised and use the
+    # same monetary basis as the Calliope model (M€ here).
+    renewables:
+      solar:
+        weight: 2
+        annualised_capacity_cost: 0.069366234867
+        variable_cost: 0.0
+
+      onshore_wind:
+        weight: 1
+        annualised_capacity_cost: 0.136565982927
+        variable_cost: 0.000002
+
+      offshore_wind:
+        weight: 1
+        annualised_capacity_cost: 0.279506201625
+        variable_cost: 0.000005
+
+    # Effective long-duration storage chain. The charging/discharging
+    # efficiencies combine conversion and cavern losses. Power and throughput
+    # costs are expressed on the electricity-input/output basis used by the
+    # proxy economics.
+    storage:
+      charging_efficiency: 0.6435
+      discharging_efficiency: 0.5544
+
+      annualised_energy_capacity_cost: 0.000319023150
+      annualised_charge_power_cost: 0.101531096308
+      annualised_discharge_power_cost: 0.134273315570
+
+      charge_variable_cost: 0.0
+      discharge_variable_cost: 0.000068964714
 
     soc_decomposition:
       method: fft_lowpass
       time_horizon_hours: 24
 
-    margin_mode: fixed
-    margin_value: 0.04
+    margin_mode: auto
+
+    # User override example:
+    # margin_mode: fixed
+    # margin_value: 0.04
 
   tsa_params:
     k_periods: 45

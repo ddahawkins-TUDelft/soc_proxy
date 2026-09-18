@@ -230,6 +230,13 @@ def _build_signals(
         }.items()
     }
 
+    # Proxy SoC levels are only defined up to an additive constant. The public
+    # proxy therefore leaves their cumulative-sum origin untouched. For level
+    # diagnostics only, remove that arbitrary offset; delta diagnostics are
+    # unchanged by this translation.
+    for name in ("reference_proxy", "clustered_proxy"):
+        prepared[name] = prepared[name] - float(prepared[name].min())
+
     index = prepared["reference_soc"].index
     for name, series in prepared.items():
         if not series.index.equals(index):

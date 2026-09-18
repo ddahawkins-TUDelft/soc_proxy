@@ -10,7 +10,7 @@ import calliope
 import pandas as pd
 from tsam import AggregationResult
 
-from soc_proxy import generate_soc_proxy
+from soc_proxy import MarginDiagnostics, SocProxyResult, generate_soc_proxy
 
 from scripts.helpers.calliope import run_clustered_calliope
 from scripts.helpers.timeseries import (
@@ -37,6 +37,8 @@ class TSAArtifacts:
     cluster_map: pd.Series
     reconstructed_timeseries: pd.DataFrame
     reconstructed_proxy: pd.DataFrame
+    proxy_margin: float
+    proxy_margin_diagnostics: MarginDiagnostics | None
 
 
 @dataclass
@@ -122,10 +124,11 @@ def run_tsa_case(
     # 1. Generate the SoC proxy on the original chronology
     # ------------------------------------------------------------------
 
-    original_proxy = _generate_proxy(
+    original_proxy_result = _generate_proxy(
         timeseries,
         soc_proxy_params,
     )
+    original_proxy = original_proxy_result.data
 
     # ------------------------------------------------------------------
     # 2. Construct the feature matrix used by TSAM
@@ -181,10 +184,18 @@ def run_tsa_case(
     # 5. Recompute the proxy implied by the TSA representation
     # ------------------------------------------------------------------
 
-    reconstructed_proxy = _generate_proxy(
+    # The margin is a property of the original chronology. If it was selected
+    # automatically, do not select it again after TSA has altered the signal.
+    reconstructed_proxy_params = {
+        **soc_proxy_params,
+        "margin_mode": "fixed",
+        "margin_value": original_proxy_result.margin,
+    }
+    reconstructed_proxy_result = _generate_proxy(
         reconstructed_timeseries,
-        soc_proxy_params,
+        reconstructed_proxy_params,
     )
+    reconstructed_proxy = reconstructed_proxy_result.data
 
     return TSAArtifacts(
         original_timeseries=timeseries,
@@ -193,6 +204,8 @@ def run_tsa_case(
         cluster_map=cluster_map,
         reconstructed_timeseries=reconstructed_timeseries,
         reconstructed_proxy=reconstructed_proxy,
+        proxy_margin=original_proxy_result.margin,
+        proxy_margin_diagnostics=original_proxy_result.margin_diagnostics,
     )
 
 
@@ -255,11 +268,9 @@ def _build_tsa_weights(
 def _generate_proxy(
     timeseries: pd.DataFrame,
     params: dict[str, Any],
-) -> pd.DataFrame:
-    """Generate SoC-proxy fields from a chronological timeseries."""
-    result, _, _ = generate_soc_proxy(
+) -> SocProxyResult:
+    """Generate the SoC Proxy using the public contribution API."""
+    return generate_soc_proxy(
         df=timeseries,
         **params,
     )
-
-    return result
