@@ -9,11 +9,14 @@ import pandas as pd
 
 def extract_parameters(
     config: dict[str, Any],
-    model,
+    case,
     *,
     case_id: str,
 ) -> pd.DataFrame:
-    """Extract one row of case-level parameters."""
+    """Extract one row of configured and resolved case-level parameters."""
+    model = case.calliope_model
+    proxy_result = case.tsa.original_proxy
+
     data_params = config["data_params"]
     soc_proxy_params = config["soc_proxy_params"]
     tsa_params = config["tsa_params"]
@@ -45,7 +48,7 @@ def extract_parameters(
         "proxy_decomposition_method": decomposition["method"],
         "proxy_time_horizon_hours": decomposition["time_horizon_hours"],
         "margin_mode": soc_proxy_params["margin_mode"],
-        "margin_value": soc_proxy_params["margin_value"],
+        "margin_value": float(proxy_result.margin),
         "termination_condition": _termination_condition(model),
         "objective": _objective(model),
     }

@@ -412,16 +412,31 @@ def _chronology(
     return chronology
 
 
-def _regular_timestep_hours(chronology: pd.DatetimeIndex) -> float:
-    deltas = np.diff(chronology.asi8)
-    if len(deltas) == 0:
-        raise ValueError("At least two timestamps are required.")
-    if not np.all(deltas == deltas[0]):
-        raise ValueError("Timeseries data must have a regular timestep.")
+def _regular_timestep_hours(
+    chronology: pd.DatetimeIndex,
+) -> float:
+    if len(chronology) < 2:
+        raise ValueError(
+            "At least two timestamps are required."
+        )
 
-    hours = float(deltas[0] / 3_600_000_000_000)
+    deltas = chronology[1:] - chronology[:-1]
+    timestep = deltas[0]
+
+    if not np.all(deltas == timestep):
+        raise ValueError(
+            "Timeseries data must have a regular timestep."
+        )
+
+    hours = float(
+        timestep / pd.Timedelta(hours=1)
+    )
+
     if hours <= 0:
-        raise ValueError("Timeseries timestep must be positive.")
+        raise ValueError(
+            "Timeseries timestep must be positive."
+        )
+
     return hours
 
 

@@ -86,7 +86,7 @@ def extract_case_results(
 
     parameters = extract_parameters(
         config,
-        model,
+        case,
         case_id=case_id,
     )
 
@@ -131,8 +131,8 @@ def extract_case_results(
         case_id=case_id,
         reference_model=reference_model,
         clustered_model=model,
-        original_proxy=case.tsa.original_proxy,
-        reconstructed_proxy=case.tsa.reconstructed_proxy,
+        original_proxy=case.tsa.original_proxy.data,
+        reconstructed_proxy=case.tsa.reconstructed_proxy.data,
         cluster_map=case.tsa.cluster_map,
     )
 

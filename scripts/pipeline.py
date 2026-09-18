@@ -10,7 +10,7 @@ import calliope
 import pandas as pd
 from tsam import AggregationResult
 
-from soc_proxy import MarginDiagnostics, SocProxyResult, generate_soc_proxy
+from soc_proxy import SocProxyResult, generate_soc_proxy
 
 from scripts.helpers.calliope import run_clustered_calliope
 from scripts.helpers.timeseries import (
@@ -30,15 +30,13 @@ class TSAArtifacts:
     """Outputs produced before the Calliope solve."""
 
     original_timeseries: pd.DataFrame
-    original_proxy: pd.DataFrame
+    original_proxy: SocProxyResult
 
     tsa_result: AggregationResult
 
     cluster_map: pd.Series
     reconstructed_timeseries: pd.DataFrame
-    reconstructed_proxy: pd.DataFrame
-    proxy_margin: float
-    proxy_margin_diagnostics: MarginDiagnostics | None
+    reconstructed_proxy: SocProxyResult
 
 
 @dataclass
@@ -124,11 +122,10 @@ def run_tsa_case(
     # 1. Generate the SoC proxy on the original chronology
     # ------------------------------------------------------------------
 
-    original_proxy_result = _generate_proxy(
+    original_proxy = _generate_proxy(
         timeseries,
         soc_proxy_params,
     )
-    original_proxy = original_proxy_result.data
 
     # ------------------------------------------------------------------
     # 2. Construct the feature matrix used by TSAM
@@ -136,7 +133,7 @@ def run_tsa_case(
 
     features, proxy_column = _build_clustering_features(
         timeseries=timeseries,
-        proxy=original_proxy,
+        proxy=original_proxy.data,
         tsa_params=tsa_params,
     )
 
@@ -189,13 +186,12 @@ def run_tsa_case(
     reconstructed_proxy_params = {
         **soc_proxy_params,
         "margin_mode": "fixed",
-        "margin_value": original_proxy_result.margin,
+        "margin_value": original_proxy.margin,
     }
-    reconstructed_proxy_result = _generate_proxy(
+    reconstructed_proxy = _generate_proxy(
         reconstructed_timeseries,
         reconstructed_proxy_params,
     )
-    reconstructed_proxy = reconstructed_proxy_result.data
 
     return TSAArtifacts(
         original_timeseries=timeseries,
@@ -204,8 +200,6 @@ def run_tsa_case(
         cluster_map=cluster_map,
         reconstructed_timeseries=reconstructed_timeseries,
         reconstructed_proxy=reconstructed_proxy,
-        proxy_margin=original_proxy_result.margin,
-        proxy_margin_diagnostics=original_proxy_result.margin_diagnostics,
     )
 
 
