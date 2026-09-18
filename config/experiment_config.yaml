@@ -50,9 +50,9 @@ defaults:
 
 experiments:
 
-  m_04:
+  baseline_NL:
     {}
 
-  m_00:
-    soc_proxy_params:
-      margin_value: 0
+  baseline_BE:
+    data_params:
+      country: BE
