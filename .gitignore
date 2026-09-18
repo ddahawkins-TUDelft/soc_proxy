@@ -14,3 +14,7 @@ data/cluster_maps/
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+#dev_experiments
+scripts/experiments/dev*
+config/calliope/dev*
