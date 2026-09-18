@@ -30,7 +30,7 @@ calliope.set_log_verbosity(
 
 configs = load_experiment_config("config/experiment_config.yaml")
 
-config = configs["baseline_BE"]
+config = configs["m_00"]
 
 
 # ---------------------------------------------------------------------------

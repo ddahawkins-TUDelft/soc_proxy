@@ -1,0 +1,148 @@
+defaults:
+  dispatch_mode: tsa
+
+  data_params:
+    country: NL
+    start_date: 2010-01-01
+    end_date: 2020-01-01
+
+  soc_proxy_params:
+    # NL brownfield capacities, end 2025, CBS
+    renewables_fields_and_weights:
+      solar: 26.04 
+      onshore_wind: 7.05 
+      offshore_wind: 4.75 
+
+    soc_decomposition:
+      method: fft_lowpass
+      time_horizon_hours: 24
+
+    margin_mode: fixed
+    margin_value: 0.0
+
+  tsa_params:
+    k_periods: 30
+    period_duration: 1D
+    preserve_column_means: true
+
+    soc_proxy:
+      enabled: true
+      lambda_soc: 0.5
+      proxy_field_name: surplus_LDES
+
+    cluster:
+      method: hierarchical
+      random_state: 42
+
+    representation:
+      method: medoid
+
+  calliope_params:
+    scenario: standard
+
+  solver_params:
+    solver: gurobi
+
+  output_params:
+    save_capacities: true
+    save_costs: true
+    save_metrics: true
+
+
+experiments:
+
+  m_00_2006:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    soc_proxy_params:
+      margin_value: 0.00
+
+  m_00_2008:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+    soc_proxy_params:
+      margin_value: 0.00
+    
+  m_00_2010:
+    soc_proxy_params:
+      margin_value: 0.00
+  
+  m_00_2012:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+    soc_proxy_params:
+      margin_value: 0.00
+
+  m_00_2014:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+    soc_proxy_params:
+      margin_value: 0.00
+  
+  m_03_2006:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    soc_proxy_params:
+      margin_value: 0.03
+  
+  m_03_2008:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+    soc_proxy_params:
+      margin_value: 0.03
+  
+  m_03_2010:
+    soc_proxy_params:
+      margin_value: 0.03
+  
+  m_03_2012:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+    soc_proxy_params:
+      margin_value: 0.03
+
+  m_03_2014:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+    soc_proxy_params:
+      margin_value: 0.03
+  
+  m_06_2006:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    soc_proxy_params:
+      margin_value: 0.06
+  
+  m_06_2008:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+    soc_proxy_params:
+      margin_value: 0.06
+  
+  m_06_2010:
+    soc_proxy_params:
+      margin_value: 0.06
+  
+  m_06_2012:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+    soc_proxy_params:
+      margin_value: 0.06
+  
+  m_06_2014:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+    soc_proxy_params:
+      margin_value: 0.06

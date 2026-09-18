@@ -20,7 +20,7 @@ defaults:
     margin_value: 0.04
 
   tsa_params:
-    k_periods: 30
+    k_periods: 45
     period_duration: 1D
     preserve_column_means: true
 
@@ -50,9 +50,9 @@ defaults:
 
 experiments:
 
-  baseline_NL:
+  m_04:
     {}
 
-  baseline_BE:
-    data_params:
-      country: BE
+  m_00:
+    soc_proxy_params:
+      margin_value: 0
