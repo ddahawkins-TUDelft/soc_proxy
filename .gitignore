@@ -17,4 +17,4 @@ data/cluster_maps/
 
 #dev_experiments
 scripts/experiments/dev*
-config/calliope/dev*
+config/dev*
