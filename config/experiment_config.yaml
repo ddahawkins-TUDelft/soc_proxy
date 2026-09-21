@@ -14,17 +14,17 @@ defaults:
     # same monetary basis as the Calliope model (M€ here).
     renewables:
       solar:
-        weight: 40
+        weight: 0.56   # From Training Script: NL 56 , BE 51
         annualised_capacity_cost: 0.069366234867
         variable_cost: 0.0
 
       onshore_wind:
-        weight: 16
+        weight: 0.2  # From Training Script: NL 20 , BE 24
         annualised_capacity_cost: 0.136565982927
         variable_cost: 0.000002
 
       offshore_wind:
-        weight: 20
+        weight: 0.24  # From Training Script: NL 24 , BE 25
         annualised_capacity_cost: 0.279506201625
         variable_cost: 0.000005
 
