@@ -33,7 +33,7 @@ configs = load_experiment_config(
     "config/experiment_config.yaml"
 )
 
-config = configs["baseline_NL"]
+config = configs["NL_2010"]
 
 
 # ---------------------------------------------------------------------------

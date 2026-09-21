@@ -14,17 +14,17 @@ defaults:
     # same monetary basis as the Calliope model (M€ here).
     renewables:
       solar:
-        weight: 2
+        weight: 40
         annualised_capacity_cost: 0.069366234867
         variable_cost: 0.0
 
       onshore_wind:
-        weight: 1
+        weight: 16
         annualised_capacity_cost: 0.136565982927
         variable_cost: 0.000002
 
       offshore_wind:
-        weight: 1
+        weight: 20
         annualised_capacity_cost: 0.279506201625
         variable_cost: 0.000005
 
@@ -84,9 +84,33 @@ defaults:
 
 experiments:
 
-  baseline_NL:
+  NL_2010:
     {}
+  
+  NL_2006:
+    data_params:
+      country: NL
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+  
+  NL_2008:
+    data_params:
+      country: NL
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+  
+  NL_2012:
+    data_params:
+      country: NL
+      start_date: 2012-01-01
+      end_date: 2022-01-01
 
-  baseline_BE:
+  NL_2014:
+    data_params:
+      country: NL
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+  BE_2010:
     data_params:
       country: BE
