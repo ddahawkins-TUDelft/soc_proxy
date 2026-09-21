@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.fft import irfft, rfft, rfftfreq
-from scipy.signal import convolve
+from scipy.ndimage import convolve1d
 
 
 @dataclass(frozen=True)
@@ -157,7 +157,7 @@ def find_min_feasible_curtailment(
     *,
     tol: float = 1e-12,
     c_init: float = 0.80,
-    c_min: float = 0.65,
+    c_min: float = 0.5,
     c_max: float = 1.0,
     max_evals: int = 60,
 ) -> tuple[float, float, int]:
@@ -309,7 +309,12 @@ def decompose_surplus(
         surplus_ldes = irfft(surplus_fft * plan.fft_mask, n=plan.n)
     else:
         assert plan.kernel is not None
-        surplus_ldes = convolve(surplus, plan.kernel, mode="same")
+        surplus_ldes = convolve1d(
+            surplus,
+            weights=plan.kernel,
+            mode="wrap",
+            origin=0,
+        )
 
     surplus_sdes = surplus - surplus_ldes
     return surplus_ldes, surplus_sdes
