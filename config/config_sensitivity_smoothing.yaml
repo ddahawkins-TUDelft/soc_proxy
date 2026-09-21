@@ -1,0 +1,467 @@
+defaults:
+  dispatch_mode: tsa
+
+  data_params:
+    country: NL
+    start_date: 2010-01-01
+    end_date: 2020-01-01
+
+  soc_proxy_params:
+    demand_field: demand_power
+    # dispatchable_capacity: 3300 # This is now resolved for each country.
+
+    # Renewable keys are input-data columns. Costs are annualised and use the
+    # same monetary basis as the Calliope model (M€ here).
+    renewables:
+      solar:
+        weight: 0.56   # From Training Script: NL 56 , BE 51
+        annualised_capacity_cost: 0.069366234867
+        variable_cost: 0.0
+
+      onshore_wind:
+        weight: 0.2  # From Training Script: NL 20 , BE 24
+        annualised_capacity_cost: 0.136565982927
+        variable_cost: 0.000002
+
+      offshore_wind:
+        weight: 0.24  # From Training Script: NL 24 , BE 25
+        annualised_capacity_cost: 0.279506201625
+        variable_cost: 0.000005
+
+    # Effective long-duration storage chain. The charging/discharging
+    # efficiencies combine conversion and cavern losses. Power and throughput
+    # costs are expressed on the electricity-input/output basis used by the
+    # proxy economics.
+    storage:
+      charging_efficiency: 0.6435
+      discharging_efficiency: 0.5544
+
+      annualised_energy_capacity_cost: 0.000319023150
+      annualised_charge_power_cost: 0.101531096308
+      annualised_discharge_power_cost: 0.134273315570
+
+      charge_variable_cost: 0.0
+      discharge_variable_cost: 0.000068964714
+
+    soc_decomposition:
+      method: fft_lowpass
+      time_horizon_hours: 24
+
+    margin_mode: auto
+
+    # User override example:
+    # margin_mode: fixed
+    # margin_value: 0.04
+
+  tsa_params:
+    k_periods: 45
+    period_duration: 1D
+    preserve_column_means: true
+
+    soc_proxy:
+      enabled: true
+      lambda_soc: 0.75
+      proxy_field_name: surplus_LDES
+
+    cluster:
+      method: hierarchical
+      random_state: 42
+
+    representation:
+      method: medoid
+
+  calliope_params:
+    {}
+    # scenario: standard # This is now resolved for each country.
+
+  solver_params:
+    solver: gurobi
+    solver_options:
+      NumericFocus: 2
+
+
+  output_params:
+    save_capacities: true
+    save_costs: true
+    save_metrics: true
+
+
+experiments:
+
+  NL_2010_fft_12h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 12
+  
+  NL_2010_fft_24h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 24
+  
+  NL_2010_fft_48h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 48
+  
+  NL_2010_fft_72h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 72
+  
+  NL_2010_fft_96h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 96
+  
+  NL_2010_fft_168h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 168
+
+  NL_2010_fft_360h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 360
+  
+  NL_2010_fft_720h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 720
+  
+  NL_2010_gaussian_12h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 12
+  
+  NL_2010_gaussian_24h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 24
+  
+  NL_2010_gaussian_48h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 48
+
+  NL_2010_gaussian_72h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 72
+  
+  NL_2010_gaussian_96h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 96
+  
+  NL_2010_gaussian_168h:
+    data_params:
+      country: NL
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 168
+    
+  BE_2010_fft_12h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 12
+  
+  BE_2010_fft_24h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 24
+  
+  BE_2010_fft_48h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 48
+  
+  BE_2010_fft_72h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 72
+  
+  BE_2010_fft_96h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 96
+  
+  BE_2010_fft_168h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 168
+
+  BE_2010_fft_360h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 360
+  
+  BE_2010_fft_720h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: fft_lowpass
+        time_horizon_hours: 720
+  
+  BE_2010_gaussian_12h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 12
+  
+  BE_2010_gaussian_24h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 24
+  
+  BE_2010_gaussian_48h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 48
+  
+  BE_2010_gaussian_72h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 72
+  
+  BE_2010_gaussian_96h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 96
+  
+  BE_2010_gaussian_168h:
+    data_params:
+      country: BE
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+      soc_decomposition:
+        method: gaussian
+        time_horizon_hours: 168
