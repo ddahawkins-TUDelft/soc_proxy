@@ -109,12 +109,24 @@ def extract_signal_metrics(
     """
     windows = _validate_windows(window_half_width_days)
 
+    reference_proxy = extract_proxy_signal(
+        original_proxy,
+        field="soc_proxy_LDES",
+    )
+
+    reference_soc = extract_storage_soc(
+        reference_model,
+        node=node,
+        tech=tech,
+        target_index=reference_proxy.index,
+    )
+    
     signals = _build_signals(
-        reference_soc=extract_storage_soc(reference_model, node=node, tech=tech),
+        reference_soc=reference_soc,
         clustered_soc=extract_storage_soc(
             clustered_model, node=node, tech=tech, cluster_map=cluster_map
         ),
-        reference_proxy=extract_proxy_signal(original_proxy, field="soc_proxy_LDES"),
+        reference_proxy=reference_proxy,
         clustered_proxy=extract_proxy_signal(
             reconstructed_proxy, field="soc_proxy_LDES"
         ),

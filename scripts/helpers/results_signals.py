@@ -31,55 +31,49 @@ def extract_storage_soc(
     node: str = "netherlands",
     tech: str = "h2_salt_cavern",
     cluster_map: pd.Series | None = None,
+    target_index: pd.DatetimeIndex | None = None,
 ) -> pd.Series:
-    """Extract the physical storage state-of-charge chronology.
+    """Extract the physical storage state-of-charge chronology."""
 
-    For an unclustered Calliope model, ``storage`` already represents the
-    physical chronological storage level.
-
-    For a clustered model using Calliope's ``storage_inter_cluster`` math,
-    physical storage is reconstructed from the inter-cluster storage level
-    and the within-representative-day storage trajectory.
-
-    Parameters
-    ----------
-    model
-        Solved Calliope model.
-    node
-        Node containing the storage technology.
-    tech
-        Storage technology to extract.
-    cluster_map
-        Mapping from each original date to its representative date. Required
-        for clustered models.
-
-    Returns
-    -------
-    pandas.Series
-        Chronological state of charge indexed by timestep.
-    """
     _require_result(model, "storage")
 
-    if "storage_inter_cluster" in model.results:
-        if cluster_map is None:
-            raise ValueError(
-                "cluster_map is required to reconstruct SoC from a "
-                "clustered Calliope model."
-            )
-
-        return _reconstruct_clustered_storage_soc(
+    # A cluster map unambiguously identifies a clustered model. The raw
+    # Calliope `storage` result is an intra-cluster trajectory and must not
+    # be interpreted directly as physical chronological SoC.
+    if cluster_map is not None:
+        soc = _reconstruct_clustered_storage_soc(
             model,
             cluster_map=cluster_map,
             node=node,
             tech=tech,
         )
 
-    return _extract_reference_storage_soc(
+        if target_index is not None:
+            target_index = pd.DatetimeIndex(target_index)
+
+            if not soc.index.equals(target_index):
+                raise RuntimeError(
+                    "Reconstructed clustered SoC does not match the "
+                    "requested target chronology."
+                )
+
+        return soc
+
+    # No cluster map: this is a full-chronology reference model.
+    soc = _extract_reference_storage_soc(
         model,
         node=node,
         tech=tech,
     )
 
+    if target_index is not None:
+        soc = _align_reference_soc(
+            model,
+            soc,
+            target_index=target_index,
+        )
+
+    return soc
 
 def extract_proxy_signal(
     proxy: pd.DataFrame,
@@ -461,3 +455,88 @@ def _require_result(
 
     if variable not in model.results:
         raise RuntimeError(f"Calliope result {variable!r} is not available.")
+
+
+def _align_reference_soc(
+    model: ModelData,
+    soc: pd.Series,
+    *,
+    target_index: pd.DatetimeIndex,
+) -> pd.Series:
+    """Expand validated legacy variable-duration reference timesteps."""
+
+    target_index = pd.DatetimeIndex(target_index)
+
+    if soc.index.equals(target_index):
+        return soc
+
+    if not target_index.is_monotonic_increasing:
+        raise RuntimeError("Target chronology must be monotonic.")
+
+    if target_index.has_duplicates:
+        raise RuntimeError("Target chronology contains duplicate timestamps.")
+
+    deltas = target_index[1:] - target_index[:-1]
+
+    if not (deltas == pd.Timedelta(hours=1)).all():
+        raise RuntimeError(
+            "Reference alignment currently requires a regular hourly "
+            "target chronology."
+        )
+
+    missing = target_index.difference(soc.index)
+    extra = soc.index.difference(target_index)
+
+    if len(extra):
+        raise RuntimeError(
+            "Reference chronology contains timestamps which are not "
+            "present in the target chronology."
+        )
+
+    resolution = (
+        model.inputs["timestep_resolution"]
+        .to_series()
+        .astype(float)
+    )
+    resolution.index = pd.DatetimeIndex(resolution.index)
+
+    for timestamp in missing:
+        previous = timestamp - pd.Timedelta(hours=1)
+        following = timestamp + pd.Timedelta(hours=1)
+
+        if previous not in soc.index or following not in soc.index:
+            raise RuntimeError(
+                f"Cannot safely expand missing timestep {timestamp}."
+            )
+
+        if previous not in resolution.index:
+            raise RuntimeError(
+                f"No timestep resolution available before {timestamp}."
+            )
+
+        if not np.isclose(resolution.loc[previous], 2.0):
+            raise RuntimeError(
+                f"Missing timestep {timestamp} is not explained by "
+                "a 2-hour legacy timestep."
+            )
+
+    aligned = soc.reindex(target_index)
+
+    aligned = aligned.interpolate(
+        method="time",
+        limit_area="inside",
+    )
+
+    if aligned.isna().any():
+        raise RuntimeError(
+            "Reference SoC could not be safely expanded to the "
+            "target chronology."
+        )
+
+    aligned.name = soc.name
+    aligned.attrs["chronology_alignment"] = (
+        "legacy_variable_timestep_expansion"
+    )
+    aligned.attrs["inserted_timesteps"] = len(missing)
+
+    return aligned
