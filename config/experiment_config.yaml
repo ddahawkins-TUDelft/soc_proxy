@@ -118,7 +118,11 @@ experiments:
   BE_2010:
     data_params:
       country: BE
-  
-  GB_2010:
-    data_params:
-      country: GB
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
