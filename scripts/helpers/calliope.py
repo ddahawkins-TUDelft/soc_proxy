@@ -144,9 +144,17 @@ def build_clustered_model(
     if solver_options is not None:
         overrides["config.solve.solver_options"] = solver_options
 
+    scenario = calliope_params.get("scenario")
+
+    if not scenario:
+        raise ValueError(
+            "Resolved experiment configuration does not define "
+            "calliope_params.scenario."
+        )
+
     model = calliope.read_yaml(
         model_path,
-        scenario=calliope_params.get("scenario"),
+        scenario=scenario,
         override_dict=overrides,
         data_table_dfs={
             _TIMESERIES_TABLE: timeseries_table,

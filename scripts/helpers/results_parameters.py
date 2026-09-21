@@ -31,6 +31,7 @@ def extract_parameters(
         "case_id": case_id,
         "experiment_name": config.get("experiment_name"),
         "country": data_params["country"],
+        "dispatchable_capacity": float(soc_proxy_params["dispatchable_capacity"]),
         "start_date": start,
         "end_date": end,
         "horizon_years": _horizon_years(start, end),

@@ -8,7 +8,7 @@ defaults:
 
   soc_proxy_params:
     demand_field: demand_power
-    dispatchable_capacity: 3300
+    # dispatchable_capacity: 3300 # This is now resolved for each country.
 
     # Renewable keys are input-data columns. Costs are annualised and use the
     # same monetary basis as the Calliope model (M€ here).
@@ -71,10 +71,14 @@ defaults:
       method: medoid
 
   calliope_params:
-    scenario: standard
+    {}
+    # scenario: standard # This is now resolved for each country.
 
   solver_params:
     solver: gurobi
+    solver_options:
+      NumericFocus: 2
+
 
   output_params:
     save_capacities: true
@@ -114,3 +118,7 @@ experiments:
   BE_2010:
     data_params:
       country: BE
+  
+  GB_2010:
+    data_params:
+      country: GB

@@ -118,6 +118,13 @@ def run_tsa_case(
     soc_proxy_params = config["soc_proxy_params"]
     solver_params = config.get("solver_params", {})
 
+    if "dispatchable_capacity" not in soc_proxy_params:
+        raise ValueError(
+            "Resolved soc_proxy_params must contain "
+            "'dispatchable_capacity'. Country assumptions may not "
+            "have been resolved."
+        )
+
     # ------------------------------------------------------------------
     # 1. Generate the SoC proxy on the original chronology
     # ------------------------------------------------------------------

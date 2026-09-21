@@ -105,13 +105,27 @@ reference_model = load_reference_model(
 # 5. Extract the four diagnostic signals
 # ---------------------------------------------------------------------------
 
-reference_soc = extract_storage_soc(
-    reference_model,
+reference_proxy = extract_proxy_signal(
+    result.tsa.original_proxy.data
 )
 
-reference_proxy = extract_proxy_signal(
-    result.tsa.original_proxy.data,
+reference_soc = extract_storage_soc(
+    reference_model,
+    target_index=reference_proxy.index,
 )
+
+alignment = reference_soc.attrs.get(
+    "chronology_alignment",
+    "exact",
+)
+
+print(f"Reference chronology: {alignment}")
+
+if alignment != "exact":
+    print(
+        "Expanded reference timesteps: "
+        f"{reference_soc.attrs['inserted_timesteps']}"
+    )
 
 clustered_soc = extract_storage_soc(
     result.calliope_model,
