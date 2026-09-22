@@ -20,3 +20,5 @@ scripts/experiments/dev*
 config/dev*
 
 old/
+
+logs/

@@ -13,6 +13,7 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --output=delftblue/logs/tsa_methods_BE_%A_%a.out
 #SBATCH --error=delftblue/logs/tsa_methods_BE_%A_%a.err
+#SBATCH --array=0-179%1
 #SBATCH --account=research-tpm-ess
 
 
@@ -28,7 +29,9 @@ echo "Host:         $(hostname)"
 echo "Working dir:  $(pwd)"
 echo "Started:      $(date --iso-8601=seconds)"
 
-srun pixi run python -m scripts.experiments.run_experiment_batch \
+export PYTHONUNBUFFERED=1
+
+srun pixi run --as-is  python -u -m scripts.experiments.run_experiment_batch \
     config/sensitivity_tsa_methods_BE.yaml \
     --index "${SLURM_ARRAY_TASK_ID}"
 
