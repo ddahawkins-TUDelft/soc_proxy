@@ -14,7 +14,7 @@ defaults:
       offshore_wind: 4.75 
 
     soc_decomposition:
-      method: fft_lowpass
+      method: gaussian
       time_horizon_hours: 24
 
     margin_mode: fixed
