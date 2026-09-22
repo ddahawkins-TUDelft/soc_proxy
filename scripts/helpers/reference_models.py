@@ -8,7 +8,11 @@ from typing import Any
 
 import pandas as pd
 import xarray as xr
+import yaml
 
+from scripts.helpers.calliope import (
+    calliope_runtime_seconds_from_timings,
+)
 
 DEFAULT_REFERENCE_DIR = Path("resources/calliope_models/reference")
 
@@ -29,6 +33,7 @@ class ReferenceModel:
     path: Path
     inputs: xr.Dataset
     results: xr.Dataset
+    runtime_calliope_seconds: float
 
 
 def resolve_reference_model_path(
@@ -91,9 +96,15 @@ def load_reference_model(
         ) as dataset:
             results = dataset.load()
 
+        runtime_calliope_seconds = (
+            _load_reference_runtime_seconds(
+                path
+            )
+        )
+
     except Exception as error:
         raise RuntimeError(
-            f"Could not load numerical data from reference model {path}."
+            f"Could not load data from reference model {path}."
         ) from error
 
     if not results.data_vars:
@@ -103,4 +114,47 @@ def load_reference_model(
         path=path,
         inputs=inputs,
         results=results,
+        runtime_calliope_seconds=runtime_calliope_seconds
+    )
+
+def _load_reference_runtime_seconds(
+    path: Path,
+) -> float:
+    """Extract total Calliope runtime from stored NetCDF metadata."""
+    with xr.open_dataset(
+        path,
+        group="attrs",
+    ) as dataset:
+        runtime_raw = dataset.attrs.get(
+            "runtime"
+        )
+
+    if runtime_raw is None:
+        raise RuntimeError(
+            "Reference model contains no stored "
+            f"Calliope runtime metadata: {path}"
+        )
+
+    runtime = yaml.safe_load(
+        runtime_raw
+    )
+
+    if not isinstance(runtime, dict):
+        raise RuntimeError(
+            "Stored Calliope runtime metadata is not "
+            f"a mapping: {path}"
+        )
+
+    timings = runtime.get(
+        "timings"
+    )
+
+    if not isinstance(timings, dict):
+        raise RuntimeError(
+            "Stored Calliope runtime metadata contains "
+            f"no timing mapping: {path}"
+        )
+
+    return calliope_runtime_seconds_from_timings(
+        timings
     )

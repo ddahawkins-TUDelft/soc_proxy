@@ -23,7 +23,7 @@ from scripts.helpers.tsa import (
     prepare_calliope_inputs,
     run_tsa,
 )
-
+from time import perf_counter
 
 @dataclass
 class TSAArtifacts:
@@ -37,6 +37,9 @@ class TSAArtifacts:
     cluster_map: pd.Series
     reconstructed_timeseries: pd.DataFrame
     reconstructed_proxy: SocProxyResult
+
+    runtime_proxy_seconds: float
+    runtime_tsa_seconds: float
 
 
 @dataclass
@@ -129,14 +132,19 @@ def run_tsa_case(
     # 1. Generate the SoC proxy on the original chronology
     # ------------------------------------------------------------------
 
+    proxy_start = perf_counter()
+
     original_proxy = _generate_proxy(
         timeseries,
         soc_proxy_params,
     )
 
+    runtime_proxy_seconds = perf_counter() - proxy_start
+
     # ------------------------------------------------------------------
     # 2. Construct the feature matrix used by TSAM
     # ------------------------------------------------------------------
+    tsa_start = perf_counter()
 
     features, proxy_column = _build_clustering_features(
         timeseries=timeseries,
@@ -184,6 +192,8 @@ def run_tsa_case(
         timeseries,
     )
 
+    runtime_tsa_seconds = perf_counter() - tsa_start
+
     # ------------------------------------------------------------------
     # 5. Recompute the proxy implied by the TSA representation
     # ------------------------------------------------------------------
@@ -217,6 +227,8 @@ def run_tsa_case(
         cluster_map=cluster_map,
         reconstructed_timeseries=reconstructed_timeseries,
         reconstructed_proxy=reconstructed_proxy,
+        runtime_proxy_seconds=runtime_proxy_seconds,
+        runtime_tsa_seconds=runtime_tsa_seconds,
     )
 
 

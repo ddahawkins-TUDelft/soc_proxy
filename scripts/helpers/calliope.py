@@ -12,8 +12,8 @@ unexpected broadcasting during Calliope preprocessing.
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
-
 import calliope
 import numpy as np
 import pandas as pd
@@ -716,3 +716,75 @@ def _get_termination_condition(
             return str(termination)
 
     return None
+
+def calliope_runtime_seconds_from_timings(
+    timings: Mapping[str, Any],
+) -> float:
+    """Return Calliope wall-clock runtime from stored lifecycle timings."""
+    required = {
+        "preprocess_start",
+        "solve_complete",
+    }
+    missing = required - set(timings)
+
+    if missing:
+        raise RuntimeError(
+            "Calliope runtime is missing required "
+            f"timings: {sorted(missing)}."
+        )
+
+    start = float(
+        timings["preprocess_start"]
+    )
+    end = float(
+        timings["solve_complete"]
+    )
+
+    runtime_seconds = end - start
+
+    if runtime_seconds < 0:
+        raise RuntimeError(
+            "Calliope solve completion precedes "
+            "preprocessing start."
+        )
+
+    return runtime_seconds
+
+
+def calliope_runtime_seconds(
+    model: calliope.Model,
+) -> float:
+    """Return total Calliope runtime for a solved in-memory model."""
+    runtime = getattr(
+        model,
+        "runtime",
+        None,
+    )
+    if runtime is None:
+        raise RuntimeError(
+            "Calliope model has no runtime metadata."
+        )
+
+    timings = getattr(
+        runtime,
+        "timings",
+        None,
+    )
+    if timings is None:
+        raise RuntimeError(
+            "Calliope runtime has no timing metadata."
+        )
+
+    values = getattr(
+        timings,
+        "root",
+        None,
+    )
+    if values is None:
+        raise RuntimeError(
+            "Calliope runtime has no root timing data."
+        )
+
+    return calliope_runtime_seconds_from_timings(
+        values
+    )

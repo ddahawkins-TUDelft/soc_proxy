@@ -6,16 +6,40 @@ from typing import Any
 
 import pandas as pd
 
+from scripts.helpers.calliope import calliope_runtime_seconds
 
 def extract_parameters(
     config: dict[str, Any],
     case,
     *,
+    reference_model,
     case_id: str,
 ) -> pd.DataFrame:
     """Extract one row of configured and resolved case-level parameters."""
     model = case.calliope_model
     proxy_result = case.tsa.original_proxy
+
+    runtime_proxy_seconds = float(
+        case.tsa.runtime_proxy_seconds
+    )
+
+    runtime_tsa_seconds = float(
+        case.tsa.runtime_tsa_seconds
+    )
+
+    runtime_calliope_seconds = (
+        calliope_runtime_seconds(model)
+    )
+
+    reference_runtime_calliope_seconds = float(
+        reference_model.runtime_calliope_seconds
+    )
+
+    runtime_method_seconds = (
+        runtime_proxy_seconds
+        + runtime_tsa_seconds
+        + runtime_calliope_seconds
+    )
 
     data_params = config["data_params"]
     soc_proxy_params = config["soc_proxy_params"]
@@ -52,6 +76,13 @@ def extract_parameters(
         "margin_value": float(proxy_result.margin),
         "termination_condition": _termination_condition(model),
         "objective": _objective(model),
+        "runtime_proxy_seconds": runtime_proxy_seconds,
+        "runtime_tsa_seconds": runtime_tsa_seconds,
+        "runtime_calliope_seconds": runtime_calliope_seconds,
+        "runtime_method_seconds": runtime_method_seconds,
+        "reference_runtime_calliope_seconds": (
+            reference_runtime_calliope_seconds
+        ),
     }
 
     return pd.DataFrame([row])

@@ -87,6 +87,7 @@ def extract_case_results(
     parameters = extract_parameters(
         config,
         case,
+        reference_model=reference_model,
         case_id=case_id,
     )
 
