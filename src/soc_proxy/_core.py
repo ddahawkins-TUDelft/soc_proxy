@@ -15,6 +15,9 @@ from numpy.fft import irfft, rfft, rfftfreq
 from scipy.ndimage import convolve1d
 
 
+DEFAULT_CURTAILMENT_FACTOR_MIN = 0.5
+
+
 @dataclass(frozen=True)
 class DecompositionPlan:
     """Precomputed filter information for repeated surplus decomposition."""
@@ -157,7 +160,7 @@ def find_min_feasible_curtailment(
     *,
     tol: float = 1e-12,
     c_init: float = 0.80,
-    c_min: float = 0.5,
+    c_min: float = DEFAULT_CURTAILMENT_FACTOR_MIN,
     c_max: float = 1.0,
     max_evals: int = 60,
 ) -> tuple[float, float, int]:

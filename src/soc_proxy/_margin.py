@@ -5,18 +5,26 @@ renewable and storage definitions in :func:`soc_proxy.generate_soc_proxy`; this
 module receives validated, normalised specifications and evaluates a compact
 margin sweep entirely with NumPy arrays.
 
-Selection currently combines two independently motivated informants:
+Selection combines two independently motivated informants:
 
 * economic saturation: the first margin capturing at least 80% of the maximum
-  annual proxy-system cost saving available over the internal sweep;
+  annual proxy-system cost saving available over the evaluated sweep;
 * persistent terminal event: the first margin whose dominant LDES event belongs
   to the event which persists across the high-margin tail.
 
-The selected margin is the larger of those two values. Lower-tail / delta
-sparsity is recorded as a diagnostic rather than used as a hard constraint;
-there is not yet sufficient evidence for a universal sparsity threshold. This
-keeps the selection rule explicit and avoids hiding an unvalidated tuning
-constant inside the public API.
+The selected margin is the larger of those two values. The sweep initially
+covers 0--15% in 0.5 percentage-point increments. If either the economic
+frontier or persistent terminal event remains too close to that upper boundary,
+the sweep extends in 5 percentage-point blocks until both criteria are safely
+interior. Extension is bounded by the minimum curtailment factor supported by
+the feasibility search, preventing automatic margin selection from driving the
+renewable scaling into an extreme overbuild regime simply to manufacture an
+interior solution.
+
+Lower-tail / delta sparsity is recorded as a diagnostic rather than used as a
+hard constraint; there is not yet sufficient evidence for a universal sparsity
+threshold. This keeps the selection rule explicit and avoids hiding an
+unvalidated tuning constant inside the public API.
 """
 
 from __future__ import annotations
@@ -27,10 +35,17 @@ from typing import Mapping
 import numpy as np
 import pandas as pd
 
-from ._core import DecompositionPlan, ProxyArrays, build_proxy_arrays
+from ._core import (
+    DEFAULT_CURTAILMENT_FACTOR_MIN,
+    DecompositionPlan,
+    ProxyArrays,
+    build_proxy_arrays,
+)
 
 
-_AUTO_MARGINS = np.round(np.arange(0.0, 0.1500001, 0.005), 6)
+_MARGIN_STEP = 0.005
+_INITIAL_MARGIN_MAX = 0.15
+_MARGIN_EXTENSION = 0.05
 _ECONOMIC_CAPTURE_TARGET = 0.80
 _TERMINAL_TAIL_POINTS = 5
 _EVENT_TOLERANCE_DAYS = 90
@@ -75,19 +90,6 @@ class MarginDiagnostics:
     sweep: pd.DataFrame
 
 
-@dataclass(frozen=True)
-class _Candidate:
-    margin: float
-    curtailment_factor: float
-    total_renewable_capacity: float
-    annual_cost: float
-    ldes_range: float
-    dominant_peak_timestamp: pd.Timestamp
-    terminal_event_prominence: float | None
-    near_zero_1pct_delta_fraction: float
-    near_zero_5pct_delta_fraction: float
-
-
 def select_margin(
     *,
     chronology: pd.DatetimeIndex,
@@ -101,8 +103,26 @@ def select_margin(
     decomposition_plan: DecompositionPlan,
     horizon_years: float,
 ) -> MarginDiagnostics:
-    """Select an endogenous margin from a lightweight internal sweep."""
+    """Select an endogenous margin from an adaptive lightweight sweep.
+
+    The normal path evaluates margins from 0 to 15%. The upper bound is
+    extended only when the economic cost minimum or the first occurrence of the
+    persistent high-margin event is too close to the edge of the evaluated
+    domain. This makes 15% an efficient initial search extent rather than a
+    substantive assumption about the maximum valid margin.
+
+    The search will not extend far enough to reduce the candidate curtailment
+    factor below :data:`DEFAULT_CURTAILMENT_FACTOR_MIN`. If the selector cannot
+    establish an interior solution before reaching that numerical guard, it
+    raises rather than silently returning a boundary-constrained result.
+    """
     _validate_auto_economics(renewables, storage)
+    _validate_margin_inputs(
+        chronology=chronology,
+        base_renewable_capacity=base_renewable_capacity,
+        c_star=c_star,
+        horizon_years=horizon_years,
+    )
 
     fixed_cost_rate = sum(
         spec.weight * float(spec.annualised_capacity_cost)
@@ -116,67 +136,57 @@ def select_margin(
             * float(spec.variable_cost)
         )
 
+    max_allowed_margin = _maximum_allowed_margin(c_star)
+    current_max = min(_INITIAL_MARGIN_MAX, max_allowed_margin)
+    next_margin = 0.0
+
     raw_candidates: list[dict[str, object]] = []
 
-    for margin in _AUTO_MARGINS:
-        curtailment_factor = max(1e-6, c_star * (1.0 - float(margin)))
-        arrays = build_proxy_arrays(
-            base_gen=base_gen,
-            demand=residual_demand,
-            curtailment_factor=curtailment_factor,
-            eta_ch=storage.charging_efficiency,
-            eta_dis=storage.discharging_efficiency,
-            decomposition_plan=decomposition_plan,
+    while True:
+        for margin in _margin_values(next_margin, current_max):
+            raw_candidates.append(
+                _evaluate_candidate(
+                    margin=float(margin),
+                    chronology=chronology,
+                    residual_demand=residual_demand,
+                    base_gen=base_gen,
+                    base_renewable_capacity=base_renewable_capacity,
+                    c_star=c_star,
+                    storage=storage,
+                    decomposition_plan=decomposition_plan,
+                    fixed_cost_rate=fixed_cost_rate,
+                    variable_cost_profile=variable_cost_profile,
+                    horizon_years=horizon_years,
+                )
+            )
+
+        sweep, terminal_timestamp, support_fraction = _build_sweep(
+            raw_candidates,
+            chronology=chronology,
         )
 
-        total_capacity = base_renewable_capacity / curtailment_factor
-        annual_cost = _proxy_system_annual_cost(
-            arrays=arrays,
-            total_renewable_capacity=total_capacity,
-            fixed_renewable_cost_rate=fixed_cost_rate,
-            variable_renewable_cost_profile=variable_cost_profile,
-            residual_demand=residual_demand,
-            storage=storage,
-            horizon_years=horizon_years,
+        if _margin_sweep_is_resolved(sweep):
+            break
+
+        if current_max >= max_allowed_margin - 1e-12:
+            minimum_cost_margin = _minimum_cost_margin(sweep)
+            event_margin = _first_terminal_event_margin(sweep)
+            raise RuntimeError(
+                "Automatic margin selection remained boundary-constrained "
+                "before reaching the minimum supported curtailment factor. "
+                f"Last evaluated margin={current_max:.1%}; "
+                f"economic minimum={minimum_cost_margin:.1%}; "
+                f"terminal-event onset={event_margin:.1%}; "
+                f"c*={c_star:.6f}; "
+                f"minimum curtailment factor="
+                f"{DEFAULT_CURTAILMENT_FACTOR_MIN:.3f}."
+            )
+
+        next_margin = current_max + _MARGIN_STEP
+        current_max = min(
+            current_max + _MARGIN_EXTENSION,
+            max_allowed_margin,
         )
-
-        shifted_soc = arrays.soc_ldes - float(np.min(arrays.soc_ldes))
-        dominant_idx = int(np.argmax(shifted_soc))
-        sparsity = _near_zero_delta_exposure(shifted_soc)
-
-        raw_candidates.append(
-            {
-                "margin": float(margin),
-                "curtailment_factor": float(curtailment_factor),
-                "total_renewable_capacity": float(total_capacity),
-                "annual_cost": float(annual_cost),
-                "ldes_range": float(np.ptp(shifted_soc)),
-                "dominant_peak_timestamp": chronology[dominant_idx],
-                "near_zero_1pct_delta_fraction": sparsity[0.01],
-                "near_zero_5pct_delta_fraction": sparsity[0.05],
-                "soc_ldes": shifted_soc,
-            }
-        )
-
-    terminal_timestamp, support_fraction = _terminal_event(raw_candidates)
-
-    for row in raw_candidates:
-        shifted_soc = np.asarray(row.pop("soc_ldes"), dtype=np.float64)
-        row["terminal_event_prominence"] = _event_prominence(
-            shifted_soc,
-            chronology,
-            terminal_timestamp,
-        )
-        row["terminal_event_match"] = _same_event(
-            pd.Timestamp(row["dominant_peak_timestamp"]),
-            terminal_timestamp,
-        )
-
-    sweep = pd.DataFrame(raw_candidates).sort_values("margin").reset_index(
-        drop=True
-    )
-    sweep = _add_frontier_diagnostics(sweep)
-    sweep = _add_economic_capture(sweep)
 
     economic_margin = float(
         sweep.loc[
@@ -186,12 +196,7 @@ def select_margin(
         ].iloc[0]
     )
 
-    event_matches = sweep.loc[sweep["terminal_event_match"], "margin"]
-    if event_matches.empty:
-        # The tail event itself must occur somewhere, so this should only be
-        # reachable through a pathological timestamp/index mismatch.
-        raise RuntimeError("Terminal event was not found in the margin sweep.")
-    terminal_event_margin = float(event_matches.iloc[0])
+    terminal_event_margin = _first_terminal_event_margin(sweep)
 
     selected_margin = max(economic_margin, terminal_event_margin)
     selected = sweep.loc[np.isclose(sweep["margin"], selected_margin)]
@@ -218,6 +223,186 @@ def select_margin(
         ),
         sweep=sweep,
     )
+
+
+def _evaluate_candidate(
+    *,
+    margin: float,
+    chronology: pd.DatetimeIndex,
+    residual_demand: np.ndarray,
+    base_gen: np.ndarray,
+    base_renewable_capacity: float,
+    c_star: float,
+    storage: StorageSpec,
+    decomposition_plan: DecompositionPlan,
+    fixed_cost_rate: float,
+    variable_cost_profile: np.ndarray,
+    horizon_years: float,
+) -> dict[str, object]:
+    """Evaluate one auto-margin candidate."""
+    curtailment_factor = c_star * (1.0 - margin)
+
+    if curtailment_factor < DEFAULT_CURTAILMENT_FACTOR_MIN - 1e-12:
+        raise RuntimeError(
+            "Candidate margin would reduce the curtailment factor below the "
+            "supported feasibility-search domain. "
+            f"margin={margin:.1%}, c={curtailment_factor:.6f}, "
+            f"minimum={DEFAULT_CURTAILMENT_FACTOR_MIN:.6f}."
+        )
+
+    arrays = build_proxy_arrays(
+        base_gen=base_gen,
+        demand=residual_demand,
+        curtailment_factor=curtailment_factor,
+        eta_ch=storage.charging_efficiency,
+        eta_dis=storage.discharging_efficiency,
+        decomposition_plan=decomposition_plan,
+    )
+
+    total_capacity = base_renewable_capacity / curtailment_factor
+    annual_cost = _proxy_system_annual_cost(
+        arrays=arrays,
+        total_renewable_capacity=total_capacity,
+        fixed_renewable_cost_rate=fixed_cost_rate,
+        variable_renewable_cost_profile=variable_cost_profile,
+        residual_demand=residual_demand,
+        storage=storage,
+        horizon_years=horizon_years,
+    )
+
+    shifted_soc = arrays.soc_ldes - float(np.min(arrays.soc_ldes))
+    dominant_idx = int(np.argmax(shifted_soc))
+    sparsity = _near_zero_delta_exposure(shifted_soc)
+
+    return {
+        "margin": float(margin),
+        "curtailment_factor": float(curtailment_factor),
+        "total_renewable_capacity": float(total_capacity),
+        "annual_cost": float(annual_cost),
+        "ldes_range": float(np.ptp(shifted_soc)),
+        "dominant_peak_timestamp": chronology[dominant_idx],
+        "near_zero_1pct_delta_fraction": sparsity[0.01],
+        "near_zero_5pct_delta_fraction": sparsity[0.05],
+        # Retain the trajectory until the adaptive domain is finalised. The
+        # terminal event can change when new high-margin candidates are added.
+        "soc_ldes": shifted_soc,
+    }
+
+
+def _margin_values(start: float, stop: float) -> np.ndarray:
+    """Return an inclusive margin grid between two already-bounded values."""
+    if stop < start - 1e-12:
+        return np.empty(0, dtype=np.float64)
+
+    return np.round(
+        np.arange(
+            start,
+            stop + 0.5 * _MARGIN_STEP,
+            _MARGIN_STEP,
+        ),
+        6,
+    )
+
+
+def _maximum_allowed_margin(c_star: float) -> float:
+    """Return the largest grid margin that preserves the supported c-domain."""
+    raw_max = 1.0 - DEFAULT_CURTAILMENT_FACTOR_MIN / c_star
+
+    if raw_max < 0:
+        raise RuntimeError(
+            "c_star is already below the minimum curtailment factor supported "
+            "by the automatic margin search. "
+            f"c*={c_star:.6f}, "
+            f"minimum={DEFAULT_CURTAILMENT_FACTOR_MIN:.6f}."
+        )
+
+    steps = int(np.floor((raw_max + 1e-12) / _MARGIN_STEP))
+    maximum = float(steps * _MARGIN_STEP)
+
+    minimum_required = _TERMINAL_TAIL_POINTS * _MARGIN_STEP
+    if maximum < minimum_required - 1e-12:
+        raise RuntimeError(
+            "The supported curtailment-factor domain is too narrow to evaluate "
+            "the minimum high-margin confirmation tail required by automatic "
+            "margin selection. "
+            f"Maximum admissible margin={maximum:.1%}; "
+            f"required at least={minimum_required:.1%}."
+        )
+
+    return maximum
+
+
+def _build_sweep(
+    raw_candidates: list[dict[str, object]],
+    *,
+    chronology: pd.DatetimeIndex,
+) -> tuple[pd.DataFrame, pd.Timestamp, float]:
+    """Build diagnostics for the currently evaluated adaptive margin domain."""
+    terminal_timestamp, support_fraction = _terminal_event(raw_candidates)
+
+    rows: list[dict[str, object]] = []
+    for candidate in raw_candidates:
+        row = dict(candidate)
+        shifted_soc = np.asarray(row.pop("soc_ldes"), dtype=np.float64)
+
+        row["terminal_event_prominence"] = _event_prominence(
+            shifted_soc,
+            chronology,
+            terminal_timestamp,
+        )
+        row["terminal_event_match"] = _same_event(
+            pd.Timestamp(row["dominant_peak_timestamp"]),
+            terminal_timestamp,
+        )
+        rows.append(row)
+
+    sweep = pd.DataFrame(rows).sort_values("margin").reset_index(drop=True)
+    sweep = _add_frontier_diagnostics(sweep)
+    sweep = _add_economic_capture(sweep)
+
+    return sweep, terminal_timestamp, support_fraction
+
+
+def _margin_sweep_is_resolved(sweep: pd.DataFrame) -> bool:
+    """Return whether economic and event criteria are safely inside the sweep.
+
+    A criterion is considered interior only when at least
+    ``_TERMINAL_TAIL_POINTS`` additional grid points have been evaluated above
+    it. This reuses the amount of high-margin evidence already required by the
+    terminal-event diagnostic instead of introducing a separate arbitrary
+    boundary tolerance.
+    """
+    if len(sweep) <= _TERMINAL_TAIL_POINTS:
+        return False
+
+    max_margin = float(sweep["margin"].iloc[-1])
+    confirmation_span = _TERMINAL_TAIL_POINTS * _MARGIN_STEP
+    safe_boundary = max_margin - confirmation_span
+
+    economic_resolved = _minimum_cost_margin(sweep) <= safe_boundary + 1e-12
+    event_resolved = (
+        _first_terminal_event_margin(sweep) <= safe_boundary + 1e-12
+    )
+
+    return economic_resolved and event_resolved
+
+
+def _minimum_cost_margin(sweep: pd.DataFrame) -> float:
+    """Return the first margin attaining the minimum evaluated annual cost."""
+    costs = sweep["annual_cost"].to_numpy(dtype=float)
+    minimum = float(np.min(costs))
+    rows = sweep.loc[np.isclose(sweep["annual_cost"], minimum), "margin"]
+    return float(rows.iloc[0])
+
+
+def _first_terminal_event_margin(sweep: pd.DataFrame) -> float:
+    """Return the first margin belonging to the persistent terminal event."""
+    event_matches = sweep.loc[sweep["terminal_event_match"], "margin"]
+    if event_matches.empty:
+        # The tail event itself must occur somewhere, so this should only be
+        # reachable through a pathological timestamp/index mismatch.
+        raise RuntimeError("Terminal event was not found in the margin sweep.")
+    return float(event_matches.iloc[0])
 
 
 def _proxy_system_annual_cost(
@@ -308,7 +493,6 @@ def _proxy_system_annual_cost(
     return float(vre_fixed + vre_variable + ldes_cost)
 
 
-
 def _add_frontier_diagnostics(sweep: pd.DataFrame) -> pd.DataFrame:
     """Add inexpensive physical diagnostics for the renewable/LDES frontier."""
     out = sweep.copy()
@@ -327,6 +511,7 @@ def _add_frontier_diagnostics(sweep: pd.DataFrame) -> pd.DataFrame:
         / out["total_renewable_capacity"].diff()
     )
     return out
+
 
 def _add_economic_capture(sweep: pd.DataFrame) -> pd.DataFrame:
     """Add saving relative to m=0 and fraction of attainable saving captured."""
@@ -439,6 +624,27 @@ def _near_zero_delta_exposure(shifted_soc: np.ndarray) -> dict[float, float]:
             metrics[fraction] = float(np.mean(mask[:-1] & mask[1:]))
 
     return metrics
+
+
+def _validate_margin_inputs(
+    *,
+    chronology: pd.DatetimeIndex,
+    base_renewable_capacity: float,
+    c_star: float,
+    horizon_years: float,
+) -> None:
+    """Validate scalar inputs needed by adaptive margin selection."""
+    if len(chronology) < 2:
+        raise ValueError("Automatic margin selection requires at least 2 timesteps.")
+
+    if not np.isfinite(base_renewable_capacity) or base_renewable_capacity <= 0:
+        raise ValueError("base_renewable_capacity must be finite and positive.")
+
+    if not np.isfinite(c_star) or not 0 < c_star <= 1:
+        raise ValueError("c_star must be finite and in the interval (0, 1].")
+
+    if not np.isfinite(horizon_years) or horizon_years <= 0:
+        raise ValueError("horizon_years must be finite and positive.")
 
 
 def _validate_auto_economics(
