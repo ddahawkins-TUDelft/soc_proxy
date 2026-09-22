@@ -63,12 +63,13 @@ defaults:
       lambda_soc: 0.5
       proxy_field_name: surplus_LDES
 
-    cluster:
+    cluster: # hierarchical, kmedoids
       method: hierarchical
       random_state: 42
 
-    representation:
+    representation:   # medoid, distribution_minmax (with scope: global)
       method: medoid
+      # scope: global
 
   calliope_params:
     {}
