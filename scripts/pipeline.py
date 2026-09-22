@@ -194,11 +194,21 @@ def run_tsa_case(
         **soc_proxy_params,
         "margin_mode": "fixed",
         "margin_value": original_proxy.margin,
+        # The public info/debug output describes the endogenous selection on
+        # the original chronology. Do not emit a second headline when the
+        # selected margin is merely reused after TSA.
+        "verbosity": "off",
     }
     reconstructed_proxy = _generate_proxy(
         reconstructed_timeseries,
         reconstructed_proxy_params,
     )
+
+    if soc_proxy_params.get("verbosity", "off") == "debug":
+        print(
+            "[SoC Proxy] reconstructed chronology | "
+            f"fixed margin={original_proxy.margin:.1%}"
+        )
 
     return TSAArtifacts(
         original_timeseries=timeseries,

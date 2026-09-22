@@ -43,9 +43,17 @@ class ProxyArrays:
     lost_load: float
 
 
-def compute_soc_proxy(surplus: np.ndarray) -> np.ndarray:
-    """Integrate a storage delta signal into an arbitrary-level SoC proxy."""
-    return np.cumsum(np.asarray(surplus, dtype=np.float64))
+def compute_soc_proxy(
+    surplus: np.ndarray,
+    *,
+    timestep_hours: float = 1.0,
+) -> np.ndarray:
+    """Integrate a storage-power delta signal into an energy SoC proxy."""
+    timestep_hours = _positive_timestep_hours(timestep_hours)
+    return (
+        np.cumsum(np.asarray(surplus, dtype=np.float64))
+        * timestep_hours
+    )
 
 
 def allocate_circular_lifo(
@@ -66,10 +74,11 @@ def allocate_circular_lifo(
     Returns
     -------
     np.ndarray
-        Storage delta signal in stored-energy units. Positive values charge
-        the store and negative values discharge it.
+        Storage-power delta signal. Positive values charge the store and
+        negative values discharge it.
     float
-        Unserved deficit in stored-energy units.
+        Sum of unmet stored-power deficit samples. Convert to energy by
+        multiplying by the regular timestep duration.
     """
     pos = np.asarray(pos, dtype=np.float64)
     neg = np.asarray(neg, dtype=np.float64)
@@ -142,14 +151,17 @@ def evaluate_lost_load(
     demand: np.ndarray,
     eta_ch: float,
     eta_dis: float,
+    *,
+    timestep_hours: float = 1.0,
 ) -> float:
-    """Evaluate unmet demand for one renewable overbuild factor."""
+    """Evaluate unmet energy for one renewable overbuild factor."""
+    timestep_hours = _positive_timestep_hours(timestep_hours)
     generation = base_gen / float(curtailment_factor)
     residual = generation - demand
     positive = np.maximum(residual, 0.0)
     negative = np.maximum(-residual, 0.0)
     _, lost_sum = allocate_circular_lifo(positive, negative, eta_ch, eta_dis)
-    return lost_sum
+    return float(lost_sum * timestep_hours)
 
 
 def find_min_feasible_curtailment(
@@ -158,6 +170,7 @@ def find_min_feasible_curtailment(
     eta_ch: float,
     eta_dis: float,
     *,
+    timestep_hours: float = 1.0,
     tol: float = 1e-12,
     c_init: float = 0.80,
     c_min: float = DEFAULT_CURTAILMENT_FACTOR_MIN,
@@ -173,9 +186,17 @@ def find_min_feasible_curtailment(
     """
     eta_ch = float(eta_ch)
     eta_dis = float(eta_dis)
+    timestep_hours = _positive_timestep_hours(timestep_hours)
 
     c = float(np.clip(c_init, c_min, c_max))
-    f = evaluate_lost_load(c, base_gen, demand, eta_ch, eta_dis)
+    f = evaluate_lost_load(
+        c,
+        base_gen,
+        demand,
+        eta_ch,
+        eta_dis,
+        timestep_hours=timestep_hours,
+    )
     evals = 1
 
     if f <= tol:
@@ -188,6 +209,7 @@ def find_min_feasible_curtailment(
                 demand,
                 eta_ch,
                 eta_dis,
+                timestep_hours=timestep_hours,
             )
             evals += 1
             if f_hi > tol or c_hi >= c_max or evals >= max_evals // 3:
@@ -207,6 +229,7 @@ def find_min_feasible_curtailment(
                 demand,
                 eta_ch,
                 eta_dis,
+                timestep_hours=timestep_hours,
             )
             evals += 1
             if f_lo <= tol or c_lo <= c_min or evals >= max_evals // 3:
@@ -226,6 +249,7 @@ def find_min_feasible_curtailment(
             demand,
             eta_ch,
             eta_dis,
+            timestep_hours=timestep_hours,
         )
 
         if f_mid <= tol:
@@ -237,6 +261,14 @@ def find_min_feasible_curtailment(
             break
 
     return c_lo, f_lo, evals
+
+
+def _positive_timestep_hours(value: float) -> float:
+    """Validate and return a positive regular timestep duration in hours."""
+    value = float(value)
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError("timestep_hours must be finite and positive.")
+    return value
 
 
 def build_decomposition_plan(
@@ -351,12 +383,20 @@ def build_proxy_arrays(
         decomposition_plan,
     )
 
+    timestep_hours = decomposition_plan.timestep_hours
+
     return ProxyArrays(
         generation=generation,
         surplus=surplus,
         surplus_ldes=surplus_ldes,
         surplus_sdes=surplus_sdes,
-        soc_ldes=compute_soc_proxy(surplus_ldes),
-        soc_sdes=compute_soc_proxy(surplus_sdes),
-        lost_load=lost_load,
+        soc_ldes=compute_soc_proxy(
+            surplus_ldes,
+            timestep_hours=timestep_hours,
+        ),
+        soc_sdes=compute_soc_proxy(
+            surplus_sdes,
+            timestep_hours=timestep_hours,
+        ),
+        lost_load=float(lost_load * timestep_hours),
     )

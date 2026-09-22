@@ -87,6 +87,8 @@ class MarginDiagnostics:
     selected_terminal_event_prominence: float
     selected_near_zero_1pct_delta_fraction: float
     selected_near_zero_5pct_delta_fraction: float
+    evaluated_margin_max: float
+    sweep_extended: bool
     sweep: pd.DataFrame
 
 
@@ -221,6 +223,11 @@ def select_margin(
         selected_near_zero_5pct_delta_fraction=float(
             selected_row["near_zero_5pct_delta_fraction"]
         ),
+        evaluated_margin_max=float(sweep["margin"].iloc[-1]),
+        sweep_extended=bool(
+            float(sweep["margin"].iloc[-1])
+            > _INITIAL_MARGIN_MAX + 1e-12
+        ),
         sweep=sweep,
     )
 
@@ -268,6 +275,7 @@ def _evaluate_candidate(
         residual_demand=residual_demand,
         storage=storage,
         horizon_years=horizon_years,
+        timestep_hours=decomposition_plan.timestep_hours,
     )
 
     shifted_soc = arrays.soc_ldes - float(np.min(arrays.soc_ldes))
@@ -414,6 +422,7 @@ def _proxy_system_annual_cost(
     residual_demand: np.ndarray,
     storage: StorageSpec,
     horizon_years: float,
+    timestep_hours: float,
 ) -> float:
     """Price the proxy-implied VRE/LDES system for one candidate margin."""
     vre_fixed = total_renewable_capacity * fixed_renewable_cost_rate
@@ -450,10 +459,12 @@ def _proxy_system_annual_cost(
     )
 
     # variable_renewable_cost_profile is sum(weight_i * CF_i * variable_i).
-    # Multiplication by total capacity converts it to currency/hour.
+    # Capacity converts it to currency/hour; timestep duration integrates it
+    # to currency over each represented interval.
     vre_variable = (
         total_renewable_capacity
         * float(np.sum(variable_renewable_cost_profile * dispatch_fraction))
+        * timestep_hours
         / horizon_years
     )
 
@@ -470,11 +481,13 @@ def _proxy_system_annual_cost(
 
     annual_charge_input = (
         float(np.sum(np.maximum(ldes, 0.0)))
+        * timestep_hours
         / storage.charging_efficiency
         / horizon_years
     )
     annual_discharge_output = (
         float(np.sum(np.maximum(-ldes, 0.0)))
+        * timestep_hours
         * storage.discharging_efficiency
         / horizon_years
     )

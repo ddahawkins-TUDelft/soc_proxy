@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Mapping
+from typing import Literal, Mapping, cast
 
 import numpy as np
 import pandas as pd
@@ -31,6 +31,7 @@ class SocProxyResult:
     base_renewable_capacity: float
     margin: float
     curtailment_factor: float
+    ldes_energy_capacity: float
     margin_diagnostics: MarginDiagnostics | None
 
 
@@ -45,6 +46,7 @@ def generate_soc_proxy(
     timestamp_col: str | None = None,
     margin_mode: Literal["auto", "fixed"] = "auto",
     margin_value: float | None = None,
+    verbosity: Literal["off", "info", "debug"] = "info",
 ) -> SocProxyResult:
     """Generate LDES/SDES storage proxies from demand and renewable profiles.
 
@@ -52,7 +54,7 @@ def generate_soc_proxy(
     ----------
     df
         Input chronology. Renewable fields are interpreted as per-unit capacity
-        factors; ``demand_field`` is interpreted as power demand.
+        factors; ``demand_field`` is interpreted as power demand in MW.
     renewables
         Mapping from input-column name to a technology description. Every
         technology requires ``weight``. Automatic margin selection additionally
@@ -86,8 +88,8 @@ def generate_soc_proxy(
     demand_field
         Demand column in ``df``.
     dispatchable_capacity
-        Fixed dispatchable/background capacity subtracted from demand before
-        renewable/storage balancing.
+        Fixed dispatchable/background capacity in MW, subtracted from demand
+        before renewable/storage balancing.
     soc_decomposition
         Mapping with ``method`` and ``time_horizon_hours``. Defaults to a
         24-hour FFT low-pass split.
@@ -101,6 +103,11 @@ def generate_soc_proxy(
         User-specified margin for ``margin_mode="fixed"``. Values must satisfy
         ``0 <= margin < 1``. A fixed value of zero replaces the previous
         ``margin_mode="none"`` behaviour.
+    verbosity
+        Console diagnostics. ``"off"`` emits nothing, ``"info"`` emits one
+        compact result line, and ``"debug"`` emits detailed feasibility,
+        margin-selection, and decomposition diagnostics followed by the same
+        compact result line.
 
     Returns
     -------
@@ -114,8 +121,13 @@ def generate_soc_proxy(
     zero. The proxy is defined only up to an additive constant and the TSA
     consumes its delta signal. Leaving the cumulative signal unshifted avoids
     giving artificial significance to repeated contacts with a zero level;
-    genuine flat periods in the delta signal are preserved.
+    genuine flat periods in the delta signal are preserved. ``surplus``
+    columns retain the input power units, while ``soc_proxy`` columns integrate
+    those signals over the regular timestep and therefore have energy units.
+    When power inputs are in MW, reported LDES energy capacity is in MWh/TWh.
     """
+    verbosity = _validate_verbosity(verbosity)
+
     if df.empty:
         raise ValueError("df cannot be empty.")
 
@@ -163,12 +175,15 @@ def generate_soc_proxy(
 
     base_gen = weighted_cf * base_renewable_capacity
 
-    c_star, lost_final, _ = find_min_feasible_curtailment(
-        base_gen,
-        residual_demand,
-        storage_spec.charging_efficiency,
-        storage_spec.discharging_efficiency,
-        tol=1e-12,
+    c_star, lost_final, feasibility_evaluations = (
+        find_min_feasible_curtailment(
+            base_gen,
+            residual_demand,
+            storage_spec.charging_efficiency,
+            storage_spec.discharging_efficiency,
+            timestep_hours=timestep_hours,
+            tol=1e-12,
+        )
     )
     if lost_final > 1e-9:
         raise RuntimeError(
@@ -241,15 +256,10 @@ def generate_soc_proxy(
         values[np.abs(values) < 1e-9] = 0.0
         output[column] = values
 
-    # The cycle residual is the sum of the delta signal (equivalently the final
-    # cumulative value from an implicit zero start), not last SoC minus first
-    # SoC, which would omit the first timestep's increment.
-    cycle_residual = float(np.sum(arrays.surplus_ldes))
-    if abs(cycle_residual) > 1e4:
-        print(
-            "[SoC Proxy] Warning: LDES proxy is severely non-cyclical "
-            f"(sum(delta)={cycle_residual:.3e})."
-        )
+    # The cycle residual is the final cumulative energy from an implicit
+    # zero start. Using the integrated proxy keeps this diagnostic correct for
+    # sub-hourly and multi-hour timesteps.
+    cycle_residual = float(arrays.soc_ldes[-1])
 
     selected_total_capacity = base_renewable_capacity / curtailment_factor
     renewable_capacities = {
@@ -258,17 +268,20 @@ def generate_soc_proxy(
     }
     renewable_capacities["total"] = float(selected_total_capacity)
 
-    print(
-        f"[SoC Proxy] c*={c_star:.6f} | margin={margin:.3%} | "
-        f"curtailment_factor={curtailment_factor:.6f}"
+    ldes_energy_capacity = float(np.ptp(arrays.soc_ldes))
+
+    _print_diagnostics(
+        verbosity=verbosity,
+        c_star=c_star,
+        lost_final=lost_final,
+        feasibility_evaluations=feasibility_evaluations,
+        margin=margin,
+        margin_diagnostics=margin_diagnostics,
+        ldes_energy_capacity=ldes_energy_capacity,
+        cycle_residual=cycle_residual,
+        decomposition=decomposition,
+        timestep_hours=timestep_hours,
     )
-    if margin_diagnostics is not None:
-        print(
-            "[SoC Proxy] auto margin: "
-            f"economic m80={margin_diagnostics.economic_margin_80:.3%}, "
-            f"terminal-event m={margin_diagnostics.terminal_event_margin:.3%}, "
-            f"selected={margin:.3%}"
-        )
 
     return SocProxyResult(
         data=output,
@@ -277,8 +290,174 @@ def generate_soc_proxy(
         base_renewable_capacity=base_renewable_capacity,
         margin=margin,
         curtailment_factor=curtailment_factor,
+        ldes_energy_capacity=ldes_energy_capacity,
         margin_diagnostics=margin_diagnostics,
     )
+
+
+def _validate_verbosity(
+    verbosity: str,
+) -> Literal["off", "info", "debug"]:
+    """Validate the public console-verbosity setting."""
+    if verbosity not in {"off", "info", "debug"}:
+        raise ValueError(
+            "verbosity must be one of 'off', 'info', or 'debug'."
+        )
+    return cast(Literal["off", "info", "debug"], verbosity)
+
+
+def _print_diagnostics(
+    *,
+    verbosity: Literal["off", "info", "debug"],
+    c_star: float,
+    lost_final: float,
+    feasibility_evaluations: int,
+    margin: float,
+    margin_diagnostics: MarginDiagnostics | None,
+    ldes_energy_capacity: float,
+    cycle_residual: float,
+    decomposition: Mapping[str, object],
+    timestep_hours: float,
+) -> None:
+    """Emit deterministic console diagnostics for one proxy generation."""
+    if verbosity == "off":
+        return
+
+    reason = _margin_reason(
+        margin,
+        margin_diagnostics,
+    )
+    method = str(decomposition["method"])
+    timescale = float(decomposition["time_horizon_hours"])
+
+    if verbosity == "debug":
+        print("[SoC Proxy] feasibility search")
+        print(f"  c*:                  {c_star:.6f}")
+        print(f"  evaluations:         {feasibility_evaluations}")
+        print(f"  remaining lost load: {_format_energy(lost_final)}")
+
+        print("[SoC Proxy] margin selection")
+        if margin_diagnostics is None:
+            print("  mode:                fixed")
+            print(f"  selected:            {margin:.1%}")
+        else:
+            sweep = margin_diagnostics.sweep
+            print("  mode:                auto")
+            print(
+                "  evaluated range:     "
+                f"0.0% -> {margin_diagnostics.evaluated_margin_max:.1%} "
+                f"({len(sweep)} candidates)"
+            )
+            print(
+                "  adaptive extension:  "
+                + ("yes" if margin_diagnostics.sweep_extended else "no")
+            )
+            print(
+                f"  economic m80:        "
+                f"{margin_diagnostics.economic_margin_80:.1%}"
+            )
+            print(
+                f"  terminal-event m:    "
+                f"{margin_diagnostics.terminal_event_margin:.1%}"
+            )
+            print(f"  selected:            {margin:.1%} ({reason})")
+            print(
+                f"  terminal event:      "
+                f"{margin_diagnostics.terminal_event_timestamp}"
+            )
+            print(
+                f"  tail support:        "
+                f"{margin_diagnostics.terminal_event_support_fraction:.0%}"
+            )
+            print(
+                "  lower-tail exposure: "
+                f"1%={margin_diagnostics.selected_near_zero_1pct_delta_fraction:.1%}, "
+                f"5%={margin_diagnostics.selected_near_zero_5pct_delta_fraction:.1%}"
+            )
+
+        print("[SoC Proxy] decomposition")
+        print(f"  method:              {method}")
+        print(f"  timescale:           {_format_hours(timescale)}")
+        print(f"  timestep:            {_format_hours(timestep_hours)}")
+        print(
+            f"  LDES energy capacity:{_format_energy(ldes_energy_capacity):>12}"
+        )
+        print(f"  cycle residual:      {_format_energy(cycle_residual)}")
+
+    fields = [
+        f"[SoC Proxy] c*={c_star:.6f}",
+        f"margin={margin:.1%} ({reason})",
+        f"LDES={_format_energy(ldes_energy_capacity)}",
+        f"{method}/{_format_hours(timescale, compact=True)}",
+    ]
+
+    if (
+        margin_diagnostics is not None
+        and margin_diagnostics.sweep_extended
+    ):
+        fields.append(
+            f"sweep→{margin_diagnostics.evaluated_margin_max:.0%}"
+        )
+
+    if abs(cycle_residual) > 1e4:
+        fields.append(
+            f"non-cyclic ΔE={_format_energy(cycle_residual)}"
+        )
+
+    print(" | ".join(fields))
+
+
+def _margin_reason(
+    margin: float,
+    diagnostics: MarginDiagnostics | None,
+) -> str:
+    """Return the compact reason for the selected margin."""
+    if diagnostics is None:
+        return "fixed"
+
+    economic = np.isclose(
+        margin,
+        diagnostics.economic_margin_80,
+    )
+    event = np.isclose(
+        margin,
+        diagnostics.terminal_event_margin,
+    )
+
+    if economic and event:
+        return "economic + terminal event"
+    if economic:
+        return "economic"
+    if event:
+        return "terminal event"
+
+    return "auto"
+
+
+def _format_energy(value_mwh: float) -> str:
+    """Format an energy quantity whose underlying power input is in MW."""
+    value_mwh = float(value_mwh)
+    magnitude = abs(value_mwh)
+
+    if magnitude >= 1e6:
+        return f"{value_mwh / 1e6:.2f} TWh"
+    if magnitude >= 1e3:
+        return f"{value_mwh / 1e3:.2f} GWh"
+    return f"{value_mwh:.2f} MWh"
+
+
+def _format_hours(
+    value: float,
+    *,
+    compact: bool = False,
+) -> str:
+    """Format an hour duration without unnecessary decimal places."""
+    value = float(value)
+    if value.is_integer():
+        rendered = str(int(value))
+    else:
+        rendered = f"{value:g}"
+    return f"{rendered}h" if compact else f"{rendered} h"
 
 
 def _normalise_renewables(
