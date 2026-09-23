@@ -1,20 +1,24 @@
 """Plot TSA-method sensitivity experiment results.
 
-This is an inspection plot for assessing whether the SoC proxy improves
-outcomes consistently across TSA methods, and for identifying a sensible
-base TSA method.
+This inspection figure assesses whether the SoC proxy improves outcomes
+consistently across TSA methods and helps identify a sensible base TSA method.
 
-Panels:
-    (a) Signed LDES capacity error
-    (b) Annualised-CAPEX-weighted MACME
-    (c) Clustered-v-reference CEM SoC-delta nRMSE
-    (d) TSA runtime
+Panels
+------
+(a) Signed LDES capacity error
+(b) Annualised-CAPEX-weighted MACME
+(c) Clustered-v-reference CEM SoC-delta nRMSE
+(d) TSA runtime
 
-Encoding:
-    x position : TSA method
-    sub-position : proxy weight W_P = 0, 0.5, 1
-    colour : number of representative periods k
-    small horizontal jitter : weather horizon
+Visual encoding
+---------------
+- Main x position: TSA method
+- Broad within-method offset: proxy weight W_P = 0, 0.5, 1
+- Narrow within-weight offset + colour: representative-period count k
+- Tiny jitter: country-weather-horizon replicate
+- Short horizontal bar: median across country-weather-horizon replicates
+
+Countries are deliberately pooled rather than visually differentiated.
 """
 
 from __future__ import annotations
@@ -31,22 +35,36 @@ from matplotlib.lines import Line2D
 METHOD_ORDER = [
     "hierarchical_medoid",
     "kmeans_medoid",
-    "hierarchical_distribution_minmax",
+    "hierarchical_distribution_local",
+    "hierarchical_distribution_global",
+    "hierarchical_distribution_minmax_local",
+    "hierarchical_distribution_minmax_global",
 ]
 
 METHOD_LABELS = {
     "hierarchical_medoid": "Hierarchical\n+ medoid",
     "kmeans_medoid": "k-means\n+ medoid",
-    "hierarchical_distribution_minmax": "Hierarchical\n+ distribution-minmax",
+    "hierarchical_distribution_local": (
+        "Hierarchical\n+ distribution\n(local)"
+    ),
+    "hierarchical_distribution_global": (
+        "Hierarchical\n+ distribution\n(global)"
+    ),
+    "hierarchical_distribution_minmax_local": (
+        "Hierarchical\n+ distribution-minmax\n(local)"
+    ),
+    "hierarchical_distribution_minmax_global": (
+        "Hierarchical\n+ distribution-minmax\n(global)"
+    ),
 }
 
 WP_ORDER = [0.0, 0.5, 1.0]
 
-# Large enough to separate W_P clearly, but still keep each method together.
+# Broad sub-columns inside each TSA-method block.
 WP_OFFSETS = {
-    0.0: -0.22,
+    0.0: -0.285,
     0.5: 0.0,
-    1.0: 0.22,
+    1.0: 0.285,
 }
 
 METRICS = [
@@ -114,14 +132,191 @@ def require_columns(
         )
 
 
+def pivot_investment_metrics(investment: pd.DataFrame) -> pd.DataFrame:
+    """Convert long-form investment metrics to one row per case."""
+
+    require_columns(
+        investment,
+        {"case_id", "metric", "value"},
+        table_name="investment_metrics.parquet",
+    )
+
+    duplicated = investment.duplicated(
+        subset=["case_id", "metric"],
+        keep=False,
+    )
+    if duplicated.any():
+        duplicates = investment.loc[
+            duplicated,
+            ["case_id", "metric"],
+        ].sort_values(["case_id", "metric"])
+
+        raise ValueError(
+            "investment_metrics.parquet contains duplicate "
+            "(case_id, metric) rows:\n"
+            f"{duplicates.head(30).to_string(index=False)}"
+        )
+
+    wide = (
+        investment.pivot(
+            index="case_id",
+            columns="metric",
+            values="value",
+        )
+        .reset_index()
+    )
+    wide.columns.name = None
+
+    require_columns(
+        wide,
+        {
+            "case_id",
+            "ldes_capacity_error_signed",
+            "macme_capex_weighted_annualised",
+        },
+        table_name="pivoted investment_metrics.parquet",
+    )
+
+    return wide
+
+
+def extract_soc_delta_nrmse(signals: pd.DataFrame) -> pd.DataFrame:
+    """Extract one full-horizon CEM SoC-delta nRMSE value per case."""
+
+    require_columns(
+        signals,
+        {
+            "case_id",
+            "error_family",
+            "signal_type",
+            "metric",
+            "normalisation_basis",
+            "window_half_width_days",
+            "value",
+        },
+        table_name="signal_metrics.parquet",
+    )
+
+    selected = signals.loc[
+        signals["error_family"].eq("cem")
+        & signals["signal_type"].eq("delta")
+        & signals["metric"].eq("nrmse")
+        & signals["normalisation_basis"].eq("reference_proxy_full_range")
+        & signals["window_half_width_days"].isna()
+    ].copy()
+
+    # Use this additional flag when it exists in the schema.
+    if "covers_full_horizon" in selected.columns:
+        selected = selected.loc[
+            selected["covers_full_horizon"].fillna(False)
+        ]
+
+    duplicated = selected["case_id"].duplicated(keep=False)
+    if duplicated.any():
+        duplicate_ids = sorted(
+            selected.loc[duplicated, "case_id"].astype(str).unique()
+        )
+        raise ValueError(
+            "Expected one full-horizon CEM delta nRMSE row per case, "
+            "but found duplicates for:\n"
+            + "\n".join(duplicate_ids[:20])
+        )
+
+    return selected[["case_id", "value"]].rename(
+        columns={"value": "soc_delta_nrmse"}
+    )
+
+
+def infer_representation_scope(data: pd.DataFrame) -> pd.Series:
+    """Return local/global representation scope.
+
+    Prefer an explicit recorded scope column. For older results that do not
+    record scope, infer it from experiment names. Existing historical
+    distribution-minmax cases without an explicit ``_local_`` token are
+    treated as global, matching the original experiment configuration.
+    """
+
+    for column in ("representation_scope", "scope"):
+        if column in data.columns:
+            return data[column].fillna("").astype(str).str.lower()
+
+    representation = data["representation_method"].astype(str)
+    experiment = data["experiment_name"].astype(str)
+
+    scope = pd.Series("", index=data.index, dtype="object")
+    distribution_mask = representation.isin(
+        ["distribution", "distribution_minmax"]
+    )
+
+    scope.loc[
+        distribution_mask & experiment.str.contains("_local_", regex=False)
+    ] = "local"
+
+    scope.loc[
+        distribution_mask & ~experiment.str.contains("_local_", regex=False)
+    ] = "global"
+
+    return scope
+
+
+def build_method_column(data: pd.DataFrame) -> pd.Series:
+    """Build plot method labels from clustering and representation settings."""
+
+    cluster = data["cluster_method"].astype(str).str.lower()
+    representation = (
+        data["representation_method"].astype(str).str.lower()
+    )
+    scope = infer_representation_scope(data)
+
+    method = pd.Series("unsupported", index=data.index, dtype="object")
+
+    method.loc[
+        cluster.eq("hierarchical") & representation.eq("medoid")
+    ] = "hierarchical_medoid"
+
+    method.loc[
+        cluster.eq("kmeans") & representation.eq("medoid")
+    ] = "kmeans_medoid"
+
+    method.loc[
+        cluster.eq("hierarchical")
+        & representation.eq("distribution")
+        & scope.eq("local")
+    ] = "hierarchical_distribution_local"
+
+    method.loc[
+        cluster.eq("hierarchical")
+        & representation.eq("distribution")
+        & scope.eq("global")
+    ] = "hierarchical_distribution_global"
+
+    method.loc[
+        cluster.eq("hierarchical")
+        & representation.eq("distribution_minmax")
+        & scope.eq("local")
+    ] = "hierarchical_distribution_minmax_local"
+
+    method.loc[
+        cluster.eq("hierarchical")
+        & representation.eq("distribution_minmax")
+        & scope.eq("global")
+    ] = "hierarchical_distribution_minmax_global"
+
+    return method
+
+
 def load_results(results_dir: Path) -> pd.DataFrame:
     parameters_path = results_dir / "parameters.parquet"
     investment_path = results_dir / "investment_metrics.parquet"
     signal_path = results_dir / "signal_metrics.parquet"
 
     parameters = pd.read_parquet(parameters_path)
-    investment = pd.read_parquet(investment_path)
-    signals = pd.read_parquet(signal_path)
+    investment = pivot_investment_metrics(
+        pd.read_parquet(investment_path)
+    )
+    soc_delta = extract_soc_delta_nrmse(
+        pd.read_parquet(signal_path)
+    )
 
     require_columns(
         parameters,
@@ -138,80 +333,6 @@ def load_results(results_dir: Path) -> pd.DataFrame:
             "runtime_tsa_seconds",
         },
         table_name="parameters.parquet",
-    )
-
-    require_columns(
-        investment,
-        {
-            "case_id",
-            "metric",
-            "value",
-        },
-        table_name="investment_metrics.parquet",
-    )
-
-    investment = (
-        investment.pivot(
-            index="case_id",
-            columns="metric",
-            values="value",
-        )
-        .reset_index()
-    )
-
-    investment.columns.name = None
-
-    require_columns(
-        investment,
-        {
-            "case_id",
-            "ldes_capacity_error_signed",
-            "macme_capex_weighted_annualised",
-        },
-        table_name="pivoted investment_metrics.parquet",
-    )
-
-    require_columns(
-        signals,
-        {
-            "case_id",
-            "error_family",
-            "signal_type",
-            "metric",
-            "normalisation_basis",
-            "window_half_width_days",
-            "value",
-        },
-        table_name="signal_metrics.parquet",
-    )
-
-    # Full-horizon clustered-v-reference CEM error on SoC deltas.
-    soc_delta = signals.loc[
-        signals["error_family"].eq("cem")
-        & signals["signal_type"].eq("delta")
-        & signals["metric"].eq("nrmse")
-        & signals["normalisation_basis"].eq("reference_proxy_full_range")
-        & signals["window_half_width_days"].isna()
-    ].copy()
-
-    # If the schema explicitly records full-horizon coverage, enforce it.
-    if "covers_full_horizon" in soc_delta.columns:
-        soc_delta = soc_delta.loc[
-            soc_delta["covers_full_horizon"].fillna(False)
-        ]
-
-    duplicate_soc = soc_delta["case_id"].duplicated(keep=False)
-    if duplicate_soc.any():
-        duplicate_ids = sorted(
-            soc_delta.loc[duplicate_soc, "case_id"].astype(str).unique()
-        )
-        raise ValueError(
-            "Expected one full-horizon CEM delta nRMSE row per case, "
-            f"but found duplicates for: {duplicate_ids[:10]}"
-        )
-
-    soc_delta = soc_delta[["case_id", "value"]].rename(
-        columns={"value": "soc_delta_nrmse"}
     )
 
     data = (
@@ -236,62 +357,44 @@ def load_results(results_dir: Path) -> pd.DataFrame:
         .copy()
     )
 
-    # ------------------------------------------------------------------
-    # Build plotting dimensions.
-    # ------------------------------------------------------------------
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
-    data["horizon_start_year"] = data["start_date"].dt.year
+    data["horizon_start_year"] = data["start_date"].dt.year.astype(int)
 
     data["k_periods"] = data["k_periods"].astype(int)
     data["lambda_soc"] = data["lambda_soc"].astype(float)
 
-    method_conditions = [
-        data["cluster_method"].eq("hierarchical")
-        & data["representation_method"].eq("medoid"),
+    data["method"] = build_method_column(data)
 
-        data["cluster_method"].eq("kmeans")
-        & data["representation_method"].eq("medoid"),
-
-        data["cluster_method"].eq("hierarchical")
-        & data["representation_method"].eq("distribution_minmax"),
-    ]
-
-    data["method"] = np.select(
-        method_conditions,
-        METHOD_ORDER,
-        default="unsupported",
-    )
-
-    unsupported = data.loc[
-        data["method"].eq("unsupported"),
-        [
+    unsupported_columns = [
+        column
+        for column in [
             "experiment_name",
             "cluster_method",
             "representation_method",
-        ],
+            "representation_scope",
+            "scope",
+        ]
+        if column in data.columns
     ]
+    unsupported = data.loc[
+        data["method"].eq("unsupported"),
+        unsupported_columns,
+    ].drop_duplicates()
 
     if not unsupported.empty:
         raise ValueError(
-            "Found TSA combinations not represented in METHOD_ORDER:\n"
-            f"{unsupported.drop_duplicates().to_string(index=False)}"
+            "Found unsupported TSA method combinations:\n"
+            f"{unsupported.to_string(index=False)}"
         )
 
-    # ------------------------------------------------------------------
-    # Derived plotting metrics.
-    #
-    # These three error quantities are stored as fractions, so convert
-    # them to percentages for plotting.
-    # ------------------------------------------------------------------
+    # Stored as fractions; convert to percentage-point values for display.
     data["ldes_capacity_error_pct"] = (
         100.0 * data["ldes_capacity_error_signed"]
     )
-
     data["macme_capex_weighted_pct"] = (
         100.0 * data["macme_capex_weighted_annualised"]
     )
-
     data["soc_delta_nrmse_pct"] = (
         100.0 * data["soc_delta_nrmse"]
     )
@@ -300,13 +403,17 @@ def load_results(results_dir: Path) -> pd.DataFrame:
 
 
 def validate_experiment(data: pd.DataFrame) -> None:
-    """Print and validate the experiment dimensions."""
+    """Print experiment dimensions and validate expected plotting inputs."""
 
-    countries = sorted(data["country"].dropna().unique())
-    horizons = sorted(data["horizon_start_year"].dropna().unique())
-    ks = sorted(data["k_periods"].dropna().unique())
-    weights = sorted(data["lambda_soc"].dropna().unique())
-    methods = list(dict.fromkeys(data["method"]))
+    countries = sorted(str(x) for x in data["country"].dropna().unique())
+    horizons = sorted(int(x) for x in data["horizon_start_year"].dropna().unique())
+    ks = sorted(int(x) for x in data["k_periods"].dropna().unique())
+    weights = sorted(float(x) for x in data["lambda_soc"].dropna().unique())
+    methods = [
+        method
+        for method in METHOD_ORDER
+        if method in set(data["method"])
+    ]
 
     print("TSA sensitivity results")
     print("=======================")
@@ -317,12 +424,10 @@ def validate_experiment(data: pd.DataFrame) -> None:
     print(f"W_P:       {weights}")
     print(f"Methods:   {methods}")
 
-    expected_methods = set(METHOD_ORDER)
-    if set(methods) != expected_methods:
+    unknown_methods = set(data["method"]) - set(METHOD_ORDER)
+    if unknown_methods:
         raise ValueError(
-            "Unexpected TSA method set.\n"
-            f"Expected: {sorted(expected_methods)}\n"
-            f"Found:    {sorted(methods)}"
+            f"Unexpected TSA methods: {sorted(unknown_methods)}"
         )
 
     if weights != WP_ORDER:
@@ -330,7 +435,6 @@ def validate_experiment(data: pd.DataFrame) -> None:
             f"Expected proxy weights {WP_ORDER}, found {weights}."
         )
 
-    # Check whether any of the four plotted quantities are absent.
     plot_columns = [metric[0] for metric in METRICS]
     missing_counts = data[plot_columns].isna().sum()
 
@@ -343,8 +447,6 @@ def build_k_colours(k_values: list[int]) -> dict[int, tuple]:
     """Sample ordered discrete colours from plasma."""
 
     cmap = plt.get_cmap("plasma")
-
-    # Avoid the very darkest and brightest ends for readability.
     positions = np.linspace(0.12, 0.88, len(k_values))
 
     return {
@@ -353,17 +455,26 @@ def build_k_colours(k_values: list[int]) -> dict[int, tuple]:
     }
 
 
+def build_k_offsets(
+    k_values: list[int],
+    *,
+    width: float = 0.125,
+) -> dict[int, float]:
+    """Give each k value its own narrow sub-column."""
+
+    if len(k_values) == 1:
+        return {k_values[0]: 0.0}
+
+    offsets = np.linspace(-width / 2, width / 2, len(k_values))
+    return dict(zip(k_values, offsets, strict=True))
+
+
 def build_replicate_jitter(
     data: pd.DataFrame,
     *,
-    width: float = 0.075,
+    width: float = 0.015,
 ) -> dict[tuple[str, int], float]:
-    """Give country-horizon replicates small deterministic x offsets.
-
-    Country is deliberately not represented as a visual dimension; this
-    merely prevents observations from different countries and horizons from
-    being drawn directly on top of one another.
-    """
+    """Give country-horizon replicates a tiny deterministic x jitter."""
 
     replicates = sorted(
         {
@@ -379,12 +490,34 @@ def build_replicate_jitter(
     if len(replicates) == 1:
         return {replicates[0]: 0.0}
 
-    offsets = np.linspace(-width / 2, width / 2, len(replicates))
+    offsets = np.linspace(
+        -width / 2,
+        width / 2,
+        len(replicates),
+    )
 
-    return {
-        replicate: offset
-        for replicate, offset in zip(replicates, offsets, strict=True)
-    }
+    return dict(zip(replicates, offsets, strict=True))
+
+
+def build_method_positions(
+    active_methods: list[str],
+) -> dict[str, float]:
+    """Position methods, with an extra gap after the two medoid methods."""
+
+    positions: dict[str, float] = {}
+    x = 0.0
+
+    for index, method in enumerate(active_methods):
+        positions[method] = x
+
+        # Visually separate clustering-method comparison from the
+        # distribution-representation family when both are present.
+        if index == 1 and len(active_methods) > 2:
+            x += 1.20
+        else:
+            x += 1.0
+
+    return positions
 
 
 def plot_metric(
@@ -395,17 +528,15 @@ def plot_metric(
     title: str,
     ylabel: str,
     k_colours: dict[int, tuple],
+    k_offsets: dict[int, float],
     replicate_jitter: dict[tuple[str, int], float],
+    active_methods: list[str],
 ) -> None:
-    """Plot one sensitivity metric."""
+    """Plot one TSA sensitivity metric."""
 
-    method_positions = {
-        method: index
-        for index, method in enumerate(METHOD_ORDER)
-    }
+    method_positions = build_method_positions(active_methods)
 
-    # Raw weather-horizon observations.
-    for method in METHOD_ORDER:
+    for method in active_methods:
         method_data = data.loc[data["method"].eq(method)]
         method_x = method_positions[method]
 
@@ -413,23 +544,24 @@ def plot_metric(
             wp_data = method_data.loc[
                 np.isclose(method_data["lambda_soc"], wp)
             ]
-
-            centre_x = method_x + WP_OFFSETS[wp]
+            wp_centre = method_x + WP_OFFSETS[wp]
 
             for k, colour in k_colours.items():
                 subset = wp_data.loc[
                     wp_data["k_periods"].eq(k)
-                ].copy()
-
-                subset = subset.dropna(subset=[value_column])
+                ].dropna(subset=[value_column])
 
                 if subset.empty:
                     continue
 
-                x = np.array(
+                k_centre = wp_centre + k_offsets[k]
+
+                xs = np.array(
                     [
-                        centre_x
-                        + replicate_jitter[(str(country), int(year))]
+                        k_centre
+                        + replicate_jitter[
+                            (str(country), int(year))
+                        ]
                         for country, year in zip(
                             subset["country"],
                             subset["horizon_start_year"],
@@ -437,56 +569,79 @@ def plot_metric(
                         )
                     ]
                 )
-                y = subset[value_column].to_numpy(dtype=float)
+                ys = subset[value_column].to_numpy(dtype=float)
 
                 ax.scatter(
-                    x,
-                    y,
-                    s=28,
+                    xs,
+                    ys,
+                    s=24,
                     color=colour,
-                    alpha=0.62,
+                    alpha=0.58,
                     linewidths=0,
                     zorder=2,
                 )
 
-                # Median across weather horizons for this (method, W_P, k).
-                median = float(np.median(y))
+                median = float(np.median(ys))
+                median_half_width = 0.027
 
+                # White halo separates the summary statistic from the raw observations.
                 ax.hlines(
                     median,
-                    centre_x - 0.030,
-                    centre_x + 0.030,
-                    color=colour,
-                    linewidth=2.2,
-                    zorder=3,
+                    k_centre - median_half_width,
+                    k_centre + median_half_width,
+                    color="white",
+                    linewidth=3,
+                    zorder=4,
                 )
 
-    # Separate the three TSA-method groups visually.
-    for boundary in [0.5, 1.5]:
+                # Neutral dark bar: position identifies k; colour remains reserved
+                # for the individual k observations.
+                ax.hlines(
+                    median,
+                    k_centre - median_half_width,
+                    k_centre + median_half_width,
+                    color="0.12",
+                    linewidth=2,
+                    zorder=5,
+                )
+
+    positions = [method_positions[m] for m in active_methods]
+
+    # Subtle method boundaries.
+    for left, right in zip(positions[:-1], positions[1:], strict=True):
         ax.axvline(
-            boundary,
-            color="0.85",
-            linewidth=0.8,
+            (left + right) / 2,
+            color="0.88",
+            linewidth=0.7,
             zorder=0,
         )
 
-    ax.set_xticks(range(len(METHOD_ORDER)))
+    ax.set_xticks(positions)
     ax.set_xticklabels(
-        [METHOD_LABELS[method] for method in METHOD_ORDER]
+        [METHOD_LABELS[method] for method in active_methods],
+        fontsize=8.5,
     )
 
-    ax.set_xlim(-0.48, len(METHOD_ORDER) - 0.52)
+    ax.set_xlim(
+        min(positions) - 0.47,
+        max(positions) + 0.47,
+    )
 
-    ax.set_title(title, loc="left")
+    ax.set_title(
+        title,
+        loc="left",
+        fontsize=11,
+        pad=8,
+    )
     ax.set_ylabel(ylabel)
 
     ax.grid(
         axis="y",
         linewidth=0.6,
         alpha=0.25,
+        zorder=0,
     )
 
-    # Signed capacity error needs a clear zero-reference line.
     if value_column == "ldes_capacity_error_pct":
         ax.axhline(
             0.0,
@@ -498,17 +653,28 @@ def plot_metric(
 
 
 def make_figure(data: pd.DataFrame) -> plt.Figure:
-    k_values = sorted(data["k_periods"].unique())
+    k_values = sorted(int(k) for k in data["k_periods"].unique())
+    active_methods = [
+        method
+        for method in METHOD_ORDER
+        if method in set(data["method"])
+    ]
+
+    if not active_methods:
+        raise ValueError("No supported TSA methods were found to plot.")
+
     k_colours = build_k_colours(k_values)
+    k_offsets = build_k_offsets(k_values)
     replicate_jitter = build_replicate_jitter(data)
 
+    # Wide enough for all six method blocks; still works with the current
+    # partial dataset because only methods present in the data are displayed.
     fig, axes = plt.subplots(
         2,
         2,
-        figsize=(12.0, 8.2),
+        figsize=(17.5, 9.7),
         constrained_layout=False,
     )
-
     axes = axes.ravel()
 
     for ax, (column, title, ylabel) in zip(
@@ -523,13 +689,18 @@ def make_figure(data: pd.DataFrame) -> plt.Figure:
             title=title,
             ylabel=ylabel,
             k_colours=k_colours,
+            k_offsets=k_offsets,
             replicate_jitter=replicate_jitter,
+            active_methods=active_methods,
         )
 
+    # ------------------------------------------------------------------
+    # Header area: title, legend, and explanation all sit above plots.
+    # ------------------------------------------------------------------
     fig.suptitle(
         "TSA-method sensitivity",
-        y=0.985,
-        fontsize=14,
+        y=0.987,
+        fontsize=15,
     )
 
     legend_handles = [
@@ -546,30 +717,48 @@ def make_figure(data: pd.DataFrame) -> plt.Figure:
         for k in k_values
     ]
 
+    legend_handles.append(
+        Line2D(
+            [0],
+            [0],
+            color="0.12",
+            linewidth=2.5,
+            label="Median",
+        )
+    )
+
     fig.legend(
         handles=legend_handles,
         title="Representative periods",
         loc="upper center",
-        bbox_to_anchor=(0.5, 0.945),
-        ncol=len(k_values),
+        bbox_to_anchor=(0.5, 0.946),
+        ncol=len(k_values)+1,
         frameon=False,
+        columnspacing=1.8,
+        handletextpad=0.6,
     )
 
     fig.text(
         0.5,
-        0.018,
-        r"Within each TSA method: $W_P$ = 0 (left), 0.5 (centre), 1 (right)",
+        0.878,
+        (
+            r"Within each method: $W_P = 0,\ 0.5,\ 1$ from left to right; "
+            r"within each $W_P$: $k = 20,\ 40,\ 60,\ 90$ from left to right. "
+            "Points are country–weather-horizon cases."
+        ),
         ha="center",
-        va="bottom",
+        va="center",
+        fontsize=9.3,
+        color="0.30",
     )
 
     fig.subplots_adjust(
-        left=0.085,
-        right=0.985,
-        bottom=0.13,
-        top=0.875,
-        wspace=0.25,
-        hspace=0.34,
+        left=0.065,
+        right=0.992,
+        bottom=0.145,
+        top=0.805,
+        wspace=0.20,
+        hspace=0.42,
     )
 
     return fig
@@ -588,7 +777,6 @@ def main() -> None:
         if args.output is not None
         else args.results_dir / "tsa_methods_sensitivity.png"
     )
-
     output.parent.mkdir(parents=True, exist_ok=True)
 
     fig.savefig(
@@ -597,7 +785,6 @@ def main() -> None:
         bbox_inches="tight",
     )
 
-    # Also save a vector copy beside the PNG.
     pdf_output = output.with_suffix(".pdf")
     fig.savefig(
         pdf_output,
