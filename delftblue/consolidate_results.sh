@@ -10,8 +10,8 @@
 #SBATCH --partition=compute
 #SBATCH --time=00:30:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=8G
+#SBATCH --cpus-per-task=3
+#SBATCH --mem-per-cpu=3900MB
 #SBATCH --output=delftblue/logs/consolidate_%j.out
 #SBATCH --error=delftblue/logs/consolidate_%j.err
 #SBATCH --account=research-tpm-ess
