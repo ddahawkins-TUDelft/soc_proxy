@@ -290,20 +290,48 @@ def apply_tsa_to_timeseries(
     return tsa_result.clustering.apply(timeseries)
 
 
+def _normalise_cluster_assignment_override(
+    tsa_result: AggregationResult,
+    cluster_assignments: Collection[int],
+) -> list[int]:
+    """Validate a period-level cluster assignment override."""
+    assignments = [int(value) for value in cluster_assignments]
+
+    expected = len(tsa_result.cluster_assignments)
+    if len(assignments) != expected:
+        raise ValueError(
+            "cluster_assignments must contain one cluster ID per original "
+            f"period: {len(assignments)} != {expected}."
+        )
+
+    known_clusters = set(tsa_result.period_index)
+    unknown = sorted(set(assignments) - known_clusters)
+    if unknown:
+        raise ValueError(
+            "cluster_assignments contains cluster IDs that are not present in "
+            f"the frozen TSAM representative library: {unknown}."
+        )
+
+    return assignments
+
+
 def build_calliope_cluster_map(
     tsa_result: AggregationResult,
     *,
     name: str = "cluster_days",
+    cluster_assignments: Collection[int] | None = None,
 ) -> pd.Series:
     """Create a Calliope-compatible representative-day mapping.
 
     Calliope requires every original date to map to a representative date
     that exists in its input timeseries.
 
-    TSAM's reconstructed timeseries places each cluster's representative
-    profile at every original period assigned to that cluster. We therefore
-    select the first period assigned to each cluster as a deterministic
-    Calliope anchor date.
+    By default, the mapping is built from TSAM's own cluster assignments,
+    preserving the historical behaviour of this helper. An optional
+    ``cluster_assignments`` override can instead provide one cluster ID per
+    original representative period. This is used by experimental post-TSA
+    chronology remapping while keeping the representative profiles themselves
+    fixed.
 
     The anchor is only a label for the representative profile. For synthetic
     representations such as ``mean`` or ``distribution``, it does not imply
@@ -333,6 +361,13 @@ def build_calliope_cluster_map(
             "The current Calliope adapter expects daily typical periods."
         )
 
+    if cluster_assignments is not None:
+        override = _normalise_cluster_assignment_override(
+            tsa_result,
+            cluster_assignments,
+        )
+        periods["cluster_idx"] = override
+
     representative_dates = periods.groupby("cluster_idx", sort=True)["date"].first()
 
     cluster_map = periods["cluster_idx"].map(representative_dates)
@@ -344,9 +379,62 @@ def build_calliope_cluster_map(
     )
 
 
+def _reconstruct_from_fixed_representatives(
+    tsa_result: AggregationResult,
+    *,
+    target_columns: list[str],
+    cluster_assignments: Collection[int],
+) -> pd.DataFrame:
+    """Expand frozen representative profiles using a new chronological map.
+
+    Unlike ``ClusteringResult.apply()``, this helper does not recompute cluster
+    representatives from the new assignment. It only deploys the already-built
+    ``cluster_representatives`` at the requested periods.
+    """
+    if tsa_result.n_segments is not None:
+        raise NotImplementedError(
+            "Cluster-assignment overrides currently support unsegmented "
+            "representative periods only."
+        )
+
+    assignments = _normalise_cluster_assignment_override(
+        tsa_result,
+        cluster_assignments,
+    )
+
+    representatives = tsa_result.cluster_representatives.loc[:, target_columns]
+    n_steps = tsa_result.n_timesteps_per_period
+
+    profiles: dict[int, object] = {}
+    for cluster_id in tsa_result.period_index:
+        profile = representatives.xs(cluster_id, level=0)
+        if len(profile) != n_steps:
+            raise ValueError(
+                f"Representative {cluster_id} contains {len(profile)} timesteps; "
+                f"expected {n_steps}."
+            )
+        profiles[int(cluster_id)] = profile.to_numpy(copy=True)
+
+    values = pd.DataFrame(
+        data=pd.concat(
+            [
+                pd.DataFrame(profiles[cluster_id], columns=target_columns)
+                for cluster_id in assignments
+            ],
+            ignore_index=True,
+        ).to_numpy(),
+        columns=target_columns,
+    )
+
+    values = values.iloc[: len(tsa_result.original)].copy()
+    values.index = tsa_result.original.index
+    return values
+
 def prepare_calliope_inputs(
     tsa_result: AggregationResult,
     calliope_timeseries: pd.DataFrame,
+    *,
+    cluster_assignments: Collection[int] | None = None,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """Prepare temporal inputs for a clustered Calliope model.
 
@@ -354,6 +442,13 @@ def prepare_calliope_inputs(
     timeseries. Any clustering-only features required by TSAM during transfer
     are temporarily restored from the original clustering dataframe and then
     removed again from the reconstructed Calliope input.
+
+    When ``cluster_assignments`` is omitted, this function follows the existing
+    TSAM reconstruction path unchanged. When an override is supplied, TSAM is
+    still applied once using its original assignments to freeze the physical
+    representative profiles; only then are those fixed representatives
+    redeployed according to the override. The representation is therefore not
+    recalculated from the remapped chronology.
 
     Returns
     -------
@@ -396,17 +491,26 @@ def prepare_calliope_inputs(
 
     cluster_map = build_calliope_cluster_map(
         calliope_result,
+        cluster_assignments=cluster_assignments,
     )
 
-    # Discard clustering-only features. Calliope must receive exactly its
-    # original physical timeseries fields.
-    reconstructed_timeseries = calliope_result.reconstructed[target_columns].copy()
+    if cluster_assignments is None:
+        # Preserve the historical code path exactly when chronology remapping
+        # is not requested.
+        reconstructed_timeseries = calliope_result.reconstructed[
+            target_columns
+        ].copy()
+    else:
+        reconstructed_timeseries = _reconstruct_from_fixed_representatives(
+            calliope_result,
+            target_columns=target_columns,
+            cluster_assignments=cluster_assignments,
+        )
 
     return (
         cluster_map,
         reconstructed_timeseries,
     )
-
 
 def _build_representation(
     representation_params: dict[str, Any] | None,

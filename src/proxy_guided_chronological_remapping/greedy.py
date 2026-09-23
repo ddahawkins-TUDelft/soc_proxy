@@ -45,6 +45,7 @@ from typing import Hashable, Mapping, Sequence
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from time import perf_counter
 
 FloatArray = NDArray[np.float64]
 ObjectArray = NDArray[np.object_]
@@ -718,6 +719,8 @@ def greedy_proxy_chronology_remap(
     chronological map is allowed to adapt cheaply?
     """
 
+    print("[PGCR] Running Proxy-guided Chronological Remapping.")
+
     if lookahead_periods < 0:
         raise ValueError("lookahead_periods must be >= 0.")
 
@@ -799,7 +802,8 @@ def greedy_proxy_chronology_remap(
 
     for sweep in range(max_sweeps):
         changed = 0
-
+        sweep_start = perf_counter()
+        print(f"[PGCR] Commencing sweep: {sweep+1}.")
         for period_index in range(n_periods):
             current_rep_index = int(working_indices[period_index])
 
@@ -864,6 +868,8 @@ def greedy_proxy_chronology_remap(
             )
         )
 
+        print(f"[PGCR] Sweep {sweep+1} completed in {perf_counter() - sweep_start} seconds.")
+
         candidate_objective = diagnostics.level_nrmse
         best_objective = best_diagnostics.level_nrmse
 
@@ -879,6 +885,8 @@ def greedy_proxy_chronology_remap(
 
         if changed_fraction <= stop_changed_fraction:
             break
+
+        
 
     best_reconstructed_delta = (
         representative_matrix[best_indices].reshape(-1)

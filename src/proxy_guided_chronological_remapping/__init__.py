@@ -12,11 +12,17 @@ from .greedy import (
     proxy_error_metrics,
     reconstruct_proxy_delta,
 )
+from .tsam_adapter import (
+    TsamProxyChronologyInputs,
+    prepare_tsam_proxy_chronology_inputs,
+)
 
 __all__ = [
     "ProxyRemapDiagnostics",
     "ProxyRemapResult",
+    "TsamProxyChronologyInputs",
     "greedy_proxy_chronology_remap",
+    "prepare_tsam_proxy_chronology_inputs",
     "proxy_error_metrics",
     "reconstruct_proxy_delta",
 ]

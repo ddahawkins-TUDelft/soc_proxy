@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import calliope
 import pandas as pd
 from tsam import AggregationResult
 
+from proxy_guided_chronological_remapping import (
+    ProxyRemapResult,
+    greedy_proxy_chronology_remap,
+    prepare_tsam_proxy_chronology_inputs,
+)
 from soc_proxy import SocProxyResult, generate_soc_proxy
 
 from scripts.helpers.calliope import run_clustered_calliope
@@ -23,7 +29,7 @@ from scripts.helpers.tsa import (
     prepare_calliope_inputs,
     run_tsa,
 )
-from time import perf_counter
+
 
 @dataclass
 class TSAArtifacts:
@@ -40,6 +46,12 @@ class TSAArtifacts:
 
     runtime_proxy_seconds: float
     runtime_tsa_seconds: float
+
+    # Experimental post-TSA chronology remapping. These remain ``None`` / 0
+    # for every existing pipeline call unless proxy_chronology_params is
+    # explicitly supplied and enabled.
+    proxy_chronology_result: ProxyRemapResult | None = None
+    runtime_proxy_chronology_seconds: float = 0.0
 
 
 @dataclass
@@ -75,15 +87,19 @@ def run_case(
     source_timeseries: str | Path,
     *,
     model_path: str | Path = "config/calliope/model.yaml",
+    proxy_chronology_params: dict[str, Any] | None = None,
 ) -> CaseArtifacts:
     """Run one resolved TSA experiment through to a solved Calliope model.
 
-    TSA outputs remain in memory only. A later result-extraction layer can
-    reduce the solved model to compact outputs before these intermediates are
-    released.
+    ``proxy_chronology_params`` is an opt-in experimental hook. Omitting it
+    preserves the existing experiment pipeline and configuration behaviour.
     """
     timeseries = load_case_timeseries(config, source_timeseries)
-    tsa = run_tsa_case(config, timeseries)
+    tsa = run_tsa_case(
+        config,
+        timeseries,
+        proxy_chronology_params=proxy_chronology_params,
+    )
 
     model = run_clustered_calliope(
         config,
@@ -102,6 +118,8 @@ def run_case(
 def run_tsa_case(
     config: dict[str, Any],
     timeseries: pd.DataFrame,
+    *,
+    proxy_chronology_params: dict[str, Any] | None = None,
 ) -> TSAArtifacts:
     """Execute the TSA portion of one resolved experiment.
 
@@ -111,6 +129,11 @@ def run_tsa_case(
         Fully resolved experiment configuration.
     timeseries
         Raw chronological timeseries for the requested model horizon.
+    proxy_chronology_params
+        Optional experimental PGCR parameters. ``None`` (the default) leaves
+        the existing TSA pipeline unchanged. Supported keys are ``enabled``,
+        ``target_field_name``, ``start_period``, ``lookahead_periods``,
+        ``max_sweeps``, ``tie_tolerance``, and ``stop_changed_fraction``.
 
     Returns
     -------
@@ -187,6 +210,9 @@ def run_tsa_case(
     # 4. Apply the fitted TSA to the full Calliope timeseries
     # ------------------------------------------------------------------
 
+    # Run the established preparation path first, even when PGCR is enabled.
+    # This preserves both the old behaviour and the meaning of
+    # runtime_tsa_seconds. The experimental remapping is timed separately.
     cluster_map, reconstructed_timeseries = prepare_calliope_inputs(
         tsa_result,
         timeseries,
@@ -195,7 +221,67 @@ def run_tsa_case(
     runtime_tsa_seconds = perf_counter() - tsa_start
 
     # ------------------------------------------------------------------
-    # 5. Recompute the proxy implied by the TSA representation
+    # 4b. Optional experimental proxy-guided chronology remapping
+    # ------------------------------------------------------------------
+
+    proxy_chronology_result: ProxyRemapResult | None = None
+    runtime_proxy_chronology_seconds = 0.0
+
+    pgcr_params = proxy_chronology_params or {}
+    if pgcr_params.get("enabled", False):
+        pgcr_start = perf_counter()
+
+        target_field_name = pgcr_params.get(
+            "target_field_name",
+            tsa_params["soc_proxy"]["proxy_field_name"],
+        )
+
+        if target_field_name not in original_proxy.data.columns:
+            raise ValueError(
+                "PGCR target field "
+                f"{target_field_name!r} is not present in the original ex-ante "
+                f"SoC proxy. Available fields: {list(original_proxy.data.columns)}"
+            )
+
+        # Crucially, the target comes directly from the original pre-TSA proxy.
+        # It is never reconstructed from TSAM output.
+        pgcr_inputs = prepare_tsam_proxy_chronology_inputs(
+            tsa_result,
+            original_proxy.data[target_field_name],
+            proxy_column_name=target_field_name,
+        )
+
+        proxy_chronology_result = greedy_proxy_chronology_remap(
+            pgcr_inputs.target_delta,
+            pgcr_inputs.representative_delta,
+            pgcr_inputs.initial_cluster_map,
+            representative_period_indices=(
+                pgcr_inputs.representative_period_indices
+            ),
+            start_period=pgcr_params.get("start_period", "minimum"),
+            lookahead_periods=pgcr_params.get("lookahead_periods", 7),
+            max_sweeps=pgcr_params.get("max_sweeps", 3),
+            tie_tolerance=pgcr_params.get("tie_tolerance", 1e-12),
+            stop_changed_fraction=pgcr_params.get(
+                "stop_changed_fraction",
+                0.0,
+            ),
+        )
+
+        # Re-run only the transfer/finalisation helper. It freezes TSAM's
+        # representative profiles using the original TSAM assignment and then
+        # deploys those fixed profiles according to the PGCR map. It does not
+        # rebuild representatives from the remapped clusters.
+        cluster_map, reconstructed_timeseries = prepare_calliope_inputs(
+            tsa_result,
+            timeseries,
+            cluster_assignments=proxy_chronology_result.cluster_map,
+        )
+
+        runtime_proxy_chronology_seconds = perf_counter() - pgcr_start
+
+    # ------------------------------------------------------------------
+    # 5. Recompute the proxy implied by the final TSA representation/map
     # ------------------------------------------------------------------
 
     # The margin is a property of the original chronology. If it was selected
@@ -229,6 +315,8 @@ def run_tsa_case(
         reconstructed_proxy=reconstructed_proxy,
         runtime_proxy_seconds=runtime_proxy_seconds,
         runtime_tsa_seconds=runtime_tsa_seconds,
+        proxy_chronology_result=proxy_chronology_result,
+        runtime_proxy_chronology_seconds=runtime_proxy_chronology_seconds,
     )
 
 
