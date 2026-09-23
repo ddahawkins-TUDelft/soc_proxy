@@ -64,26 +64,17 @@ def extract_costs(
 
     if missing:
         raise RuntimeError(
-            "Required Calliope cost results are unavailable: "
-            f"{sorted(missing)}"
+            f"Required Calliope cost results are unavailable: {sorted(missing)}"
         )
 
-    annualised_capex = _monetary(
-        model.results["cost_investment_annualised"]
-    )
+    annualised_capex = _monetary(model.results["cost_investment_annualised"])
 
-    unannualised_capex = _monetary(
-        model.results["cost_investment"]
-    )
+    unannualised_capex = _monetary(model.results["cost_investment"])
 
-    fixed_opex = _monetary(
-        model.results["cost_operation_fixed"]
-    )
+    fixed_opex = _monetary(model.results["cost_operation_fixed"])
 
     variable_opex = _aggregate_variable_opex(
-        _monetary(
-            model.results["cost_operation_variable"]
-        )
+        _monetary(model.results["cost_operation_variable"])
     )
 
     capex = _capex_frame(
@@ -120,16 +111,9 @@ def _aggregate_variable_opex(
     if "timesteps" not in data.dims:
         return data
 
-    present = data.notnull().any(
-        dim="timesteps"
-    )
+    present = data.notnull().any(dim="timesteps")
 
-    return (
-        data
-        .fillna(0)
-        .sum(dim="timesteps")
-        .where(present)
-    )
+    return data.fillna(0).sum(dim="timesteps").where(present)
 
 
 def _capex_frame(
@@ -146,17 +130,9 @@ def _capex_frame(
         join="outer",
     )
 
-    annualised_series = (
-        annualised
-        .to_series()
-        .rename("value")
-    )
+    annualised_series = annualised.to_series().rename("value")
 
-    unannualised_series = (
-        unannualised
-        .to_series()
-        .rename("unannualised_value")
-    )
+    unannualised_series = unannualised.to_series().rename("unannualised_value")
 
     frame = pd.concat(
         [
@@ -199,23 +175,11 @@ def _opex_frame(
         join="outer",
     )
 
-    present = (
-        fixed.notnull()
-        | variable.notnull()
-    )
+    present = fixed.notnull() | variable.notnull()
 
-    total = (
-        fixed.fillna(0)
-        + variable.fillna(0)
-    ).where(present)
+    total = (fixed.fillna(0) + variable.fillna(0)).where(present)
 
-    frame = (
-        total
-        .to_series()
-        .dropna()
-        .rename("value")
-        .reset_index()
-    )
+    frame = total.to_series().dropna().rename("value").reset_index()
 
     if frame.empty:
         return _empty_cost_frame()
@@ -249,10 +213,7 @@ def _monetary(
     if "costs" not in data.dims:
         return data
 
-    available = [
-        str(value)
-        for value in data["costs"].values
-    ]
+    available = [str(value) for value in data["costs"].values]
 
     if available != ["monetary"]:
         raise RuntimeError(
@@ -271,17 +232,9 @@ def _validate_cost_total(
     costs: pd.DataFrame,
 ) -> None:
     """Check that additive extracted costs reproduce Calliope's total cost."""
-    extracted_total = float(
-        costs["value"].sum()
-    )
+    extracted_total = float(costs["value"].sum())
 
-    calliope_total = float(
-        _monetary(
-            model.results["cost"]
-        )
-        .sum(skipna=True)
-        .item()
-    )
+    calliope_total = float(_monetary(model.results["cost"]).sum(skipna=True).item())
 
     if not np.isclose(
         extracted_total,
@@ -297,11 +250,7 @@ def _validate_cost_total(
         )
 
     if "min_cost_optimisation" in model.results:
-        objective = float(
-            model.results[
-                "min_cost_optimisation"
-            ].item()
-        )
+        objective = float(model.results["min_cost_optimisation"].item())
 
         if not np.isclose(
             calliope_total,
@@ -325,12 +274,8 @@ def _validate_model_type(
         "reference",
         "clustered",
     }:
-        raise ValueError(
-            "model_type must be 'reference' or 'clustered'."
-        )
+        raise ValueError("model_type must be 'reference' or 'clustered'.")
 
 
 def _empty_cost_frame() -> pd.DataFrame:
-    return pd.DataFrame(
-        columns=COST_COLUMNS
-    )
+    return pd.DataFrame(columns=COST_COLUMNS)

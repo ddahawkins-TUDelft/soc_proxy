@@ -29,9 +29,7 @@ calliope.set_log_verbosity(
 # 1. Load experiment
 # ---------------------------------------------------------------------------
 
-configs = load_experiment_config(
-    "config/experiment_config.yaml"
-)
+configs = load_experiment_config("config/experiment_config.yaml")
 
 config = configs["NL_2010"]
 
@@ -61,30 +59,15 @@ print("=" * 72)
 print("SoC Proxy margin selection")
 print("=" * 72)
 
-print(
-    f"Selected margin: "
-    f"{result.tsa.original_proxy.margin:.1%}"
-)
+print(f"Selected margin: {result.tsa.original_proxy.margin:.1%}")
 
 diagnostics = result.tsa.original_proxy.margin_diagnostics
 
 if diagnostics is not None:
-    print(
-        f"Economic m80:   "
-        f"{diagnostics.economic_margin_80:.1%}"
-    )
-    print(
-        f"Event margin:   "
-        f"{diagnostics.terminal_event_margin:.1%}"
-    )
-    print(
-        "Terminal event: "
-        f"{diagnostics.terminal_event_timestamp}"
-    )
-    print(
-        "Tail support:   "
-        f"{diagnostics.terminal_event_support_fraction:.0%}"
-    )
+    print(f"Economic m80:   {diagnostics.economic_margin_80:.1%}")
+    print(f"Event margin:   {diagnostics.terminal_event_margin:.1%}")
+    print(f"Terminal event: {diagnostics.terminal_event_timestamp}")
+    print(f"Tail support:   {diagnostics.terminal_event_support_fraction:.0%}")
     print(
         "Lower-tail exposure at selected margin: "
         f"1%={diagnostics.selected_near_zero_1pct_delta_fraction:.1%}, "
@@ -96,18 +79,14 @@ if diagnostics is not None:
 # 4. Load matching full-chronology reference
 # ---------------------------------------------------------------------------
 
-reference_model = load_reference_model(
-    config
-)
+reference_model = load_reference_model(config)
 
 
 # ---------------------------------------------------------------------------
 # 5. Extract the four diagnostic signals
 # ---------------------------------------------------------------------------
 
-reference_proxy = extract_proxy_signal(
-    result.tsa.original_proxy.data
-)
+reference_proxy = extract_proxy_signal(result.tsa.original_proxy.data)
 
 reference_soc = extract_storage_soc(
     reference_model,
@@ -122,10 +101,7 @@ alignment = reference_soc.attrs.get(
 print(f"Reference chronology: {alignment}")
 
 if alignment != "exact":
-    print(
-        "Expanded reference timesteps: "
-        f"{reference_soc.attrs['inserted_timesteps']}"
-    )
+    print(f"Expanded reference timesteps: {reference_soc.attrs['inserted_timesteps']}")
 
 clustered_soc = extract_storage_soc(
     result.calliope_model,
@@ -146,39 +122,21 @@ print("=" * 72)
 print("Signal sanity checks")
 print("=" * 72)
 
-print(
-    f"Reference SoC:   {reference_soc.shape}"
-)
-print(
-    f"Reference proxy: {reference_proxy.shape}"
-)
-print(
-    f"Clustered SoC:   {clustered_soc.shape}"
-)
-print(
-    f"Clustered proxy: {clustered_proxy.shape}"
-)
+print(f"Reference SoC:   {reference_soc.shape}")
+print(f"Reference proxy: {reference_proxy.shape}")
+print(f"Clustered SoC:   {clustered_soc.shape}")
+print(f"Clustered proxy: {clustered_proxy.shape}")
 
-assert reference_soc.index.equals(
-    reference_proxy.index
-)
-assert reference_soc.index.equals(
-    clustered_soc.index
-)
-assert reference_soc.index.equals(
-    clustered_proxy.index
-)
+assert reference_soc.index.equals(reference_proxy.index)
+assert reference_soc.index.equals(clustered_soc.index)
+assert reference_soc.index.equals(clustered_proxy.index)
 
 print()
 print(
-    "Reference SoC range: "
-    f"{reference_soc.min():.2f} to "
-    f"{reference_soc.max():.2f} MWh"
+    f"Reference SoC range: {reference_soc.min():.2f} to {reference_soc.max():.2f} MWh"
 )
 print(
-    "Clustered SoC range: "
-    f"{clustered_soc.min():.2f} to "
-    f"{clustered_soc.max():.2f} MWh"
+    f"Clustered SoC range: {clustered_soc.min():.2f} to {clustered_soc.max():.2f} MWh"
 )
 
 print(
@@ -204,9 +162,7 @@ case_id = record_case_results(
 )
 
 print()
-print(
-    f"Recorded case: {case_id}"
-)
+print(f"Recorded case: {case_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -216,30 +172,18 @@ print(
 # The SoC proxy is only defined up to an additive constant. The public proxy
 # deliberately no longer shifts its minimum to zero because TSA uses the
 # delta signal. For visual comparison only, align proxy copies to zero.
-reference_proxy_plot = (
-    reference_proxy
-    - reference_proxy.min()
-)
+reference_proxy_plot = reference_proxy - reference_proxy.min()
 
-clustered_proxy_plot = (
-    clustered_proxy
-    - clustered_proxy.min()
-)
+clustered_proxy_plot = clustered_proxy - clustered_proxy.min()
 
 fig, ax = plot_soc_proxy_comparison(
     reference_soc,
     reference_proxy_plot,
     clustered_soc=clustered_soc,
     clustered_proxy=clustered_proxy_plot,
-    title=(
-        "SoC Proxy diagnostic "
-        f"(m={result.tsa.original_proxy.margin:.1%})"
-    ),
+    title=(f"SoC Proxy diagnostic (m={result.tsa.original_proxy.margin:.1%})"),
     ylabel="Stored energy (MWh)",
-    output_path=(
-        "results/figures/"
-        "soc_proxy_diagnostic.png"
-    ),
+    output_path=("results/figures/soc_proxy_diagnostic.png"),
 )
 
 plt.show()

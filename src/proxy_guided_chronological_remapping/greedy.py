@@ -150,9 +150,7 @@ def _as_period_matrix(values: ArrayLike, *, name: str) -> FloatArray:
         )
 
     if array.ndim != 2:
-        raise ValueError(
-            f"{name} must be 2D; got {array.ndim} dimensions."
-        )
+        raise ValueError(f"{name} must be 2D; got {array.ndim} dimensions.")
 
     if array.shape[0] == 0 or array.shape[1] == 0:
         raise ValueError(f"{name} must not be empty.")
@@ -171,7 +169,9 @@ def _normalise_representatives(
     """Build a representative delta matrix and ID-to-row lookup."""
 
     if not representative_delta:
-        raise ValueError("representative_delta must contain at least one representative.")
+        raise ValueError(
+            "representative_delta must contain at least one representative."
+        )
 
     representative_ids = tuple(representative_delta.keys())
 
@@ -232,9 +232,7 @@ def _validate_cluster_map(
         )
 
     unknown = {
-        value
-        for value in mapping.tolist()
-        if value not in representative_lookup
+        value for value in mapping.tolist() if value not in representative_lookup
     }
     if unknown:
         raise ValueError(
@@ -391,9 +389,7 @@ def _period_start_levels(target_delta: FloatArray) -> FloatArray:
     level_boundaries[0] = 0.0
     np.cumsum(flat, out=level_boundaries[1:])
 
-    return level_boundaries[
-        np.arange(n_periods, dtype=int) * timesteps_per_period
-    ]
+    return level_boundaries[np.arange(n_periods, dtype=int) * timesteps_per_period]
 
 
 def _validate_representative_period_indices(
@@ -504,8 +500,7 @@ def _choose_start_period(
         return start
 
     raise ValueError(
-        "start_period must be an integer or 'minimum'; "
-        f"got {start_period!r}."
+        f"start_period must be an integer or 'minimum'; got {start_period!r}."
     )
 
 
@@ -566,8 +561,7 @@ def _target_window(
         period_index = absolute_period % n_periods
 
         blocks.append(
-            target_levels[period_index]
-            + (cycle_number + wrap) * cycle_change
+            target_levels[period_index] + (cycle_number + wrap) * cycle_change
         )
 
     return np.concatenate(blocks)
@@ -587,10 +581,7 @@ def _future_relative_levels(
 
     n_periods = len(map_indices)
     indices = np.fromiter(
-        (
-            map_indices[(start_period + offset) % n_periods]
-            for offset in range(periods)
-        ),
+        (map_indices[(start_period + offset) % n_periods] for offset in range(periods)),
         dtype=np.int64,
         count=periods,
     )
@@ -1018,16 +1009,16 @@ def greedy_proxy_chronology_remap(
     # ------------------------------------------------------------------
     # Exact-feedback PGCR.
     # ------------------------------------------------------------------
-    acceptance_fractions = _normalise_acceptance_fractions(
-        exact_acceptance_fractions
-    )
+    acceptance_fractions = _normalise_acceptance_fractions(exact_acceptance_fractions)
 
     accepted_map = rotated_initial_map.copy()
     accepted_indices = initial_indices.copy()
 
     exact_evaluations = 0
 
-    def evaluate_exact(rotated_map: ObjectArray) -> tuple[FloatArray, ProxyRemapDiagnostics]:
+    def evaluate_exact(
+        rotated_map: ObjectArray,
+    ) -> tuple[FloatArray, ProxyRemapDiagnostics]:
         nonlocal exact_evaluations
 
         unrotated_map = _unrotate_map(rotated_map, selected_start)
@@ -1060,9 +1051,7 @@ def greedy_proxy_chronology_remap(
         # Treat each outer pass as the next traversal of the accepted circular
         # map. This preserves the original closure-aware sweep idea while
         # ensuring rejected proposals never leak state into the next pass.
-        accepted_cycle_total = float(
-            np.sum(representative_matrix[accepted_indices])
-        )
+        accepted_cycle_total = float(np.sum(representative_matrix[accepted_indices]))
         current_level = sweep * accepted_cycle_total
 
         proposed_periods: list[int] = []
@@ -1179,8 +1168,7 @@ def greedy_proxy_chronology_remap(
 
         improvement = current_exact_objective - best_exact_objective
         accepted = (
-            best_candidate_map is not None
-            and improvement > exact_improvement_tolerance
+            best_candidate_map is not None and improvement > exact_improvement_tolerance
         )
 
         if accepted:
@@ -1286,4 +1274,3 @@ def greedy_proxy_chronology_remap(
         exact_diagnostics=accepted_exact_diagnostics,
         exact_evaluations=exact_evaluations,
     )
-

@@ -96,11 +96,7 @@ def load_reference_model(
         ) as dataset:
             results = dataset.load()
 
-        runtime_calliope_seconds = (
-            _load_reference_runtime_seconds(
-                path
-            )
-        )
+        runtime_calliope_seconds = _load_reference_runtime_seconds(path)
 
     except Exception as error:
         raise RuntimeError(
@@ -114,8 +110,9 @@ def load_reference_model(
         path=path,
         inputs=inputs,
         results=results,
-        runtime_calliope_seconds=runtime_calliope_seconds
+        runtime_calliope_seconds=runtime_calliope_seconds,
     )
+
 
 def _load_reference_runtime_seconds(
     path: Path,
@@ -125,36 +122,23 @@ def _load_reference_runtime_seconds(
         path,
         group="attrs",
     ) as dataset:
-        runtime_raw = dataset.attrs.get(
-            "runtime"
-        )
+        runtime_raw = dataset.attrs.get("runtime")
 
     if runtime_raw is None:
         raise RuntimeError(
-            "Reference model contains no stored "
-            f"Calliope runtime metadata: {path}"
+            f"Reference model contains no stored Calliope runtime metadata: {path}"
         )
 
-    runtime = yaml.safe_load(
-        runtime_raw
-    )
+    runtime = yaml.safe_load(runtime_raw)
 
     if not isinstance(runtime, dict):
-        raise RuntimeError(
-            "Stored Calliope runtime metadata is not "
-            f"a mapping: {path}"
-        )
+        raise RuntimeError(f"Stored Calliope runtime metadata is not a mapping: {path}")
 
-    timings = runtime.get(
-        "timings"
-    )
+    timings = runtime.get("timings")
 
     if not isinstance(timings, dict):
         raise RuntimeError(
-            "Stored Calliope runtime metadata contains "
-            f"no timing mapping: {path}"
+            f"Stored Calliope runtime metadata contains no timing mapping: {path}"
         )
 
-    return calliope_runtime_seconds_from_timings(
-        timings
-    )
+    return calliope_runtime_seconds_from_timings(timings)

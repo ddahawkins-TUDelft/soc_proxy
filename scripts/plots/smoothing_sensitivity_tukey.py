@@ -43,9 +43,7 @@ BOX_WIDTH_FRACTION = 0.10
 
 def plot_smoothing_sensitivity(
     *,
-    manifest_path: str | Path = (
-        "results/sensitivity_smoothing_manifest.parquet"
-    ),
+    manifest_path: str | Path = ("results/sensitivity_smoothing_manifest.parquet"),
     results_dir: str | Path = "results",
     output_path: str | Path | None = None,
     connect_medians: bool = True,
@@ -81,29 +79,17 @@ def plot_smoothing_sensitivity(
         ``(fig, axes)``
     """
 
-    manifest_path = Path(
-        manifest_path
-    )
+    manifest_path = Path(manifest_path)
 
-    results_dir = Path(
-        results_dir
-    )
+    results_dir = Path(results_dir)
 
-    manifest = pd.read_parquet(
-        manifest_path
-    )
+    manifest = pd.read_parquet(manifest_path)
 
-    parameters = pd.read_parquet(
-        results_dir / "parameters.parquet"
-    )
+    parameters = pd.read_parquet(results_dir / "parameters.parquet")
 
-    investment_metrics = pd.read_parquet(
-        results_dir / "investment_metrics.parquet"
-    )
+    investment_metrics = pd.read_parquet(results_dir / "investment_metrics.parquet")
 
-    signal_metrics = pd.read_parquet(
-        results_dir / "signal_metrics.parquet"
-    )
+    signal_metrics = pd.read_parquet(results_dir / "signal_metrics.parquet")
 
     data = _build_plot_data(
         manifest=manifest,
@@ -115,21 +101,16 @@ def plot_smoothing_sensitivity(
     methods = [
         method
         for method in METHOD_LABELS
-        if method in set(
-            data["decomposition_method"]
-        )
+        if method in set(data["decomposition_method"])
     ]
 
     if not methods:
         raise RuntimeError(
-            "No recognised smoothing methods were found "
-            "in the sweep manifest."
+            "No recognised smoothing methods were found in the sweep manifest."
         )
 
     # Sample decomposition-method colours from the Plasma colormap.
-    cmap = plt.get_cmap(
-        "plasma"
-    )
+    cmap = plt.get_cmap("plasma")
 
     method_colours = {
         method: cmap(value)
@@ -179,11 +160,7 @@ def plot_smoothing_sensitivity(
         squeeze=False,
     )
 
-    horizons = sorted(
-        data[
-            "time_horizon_hours"
-        ].unique()
-    )
+    horizons = sorted(data["time_horizon_hours"].unique())
 
     for ax, (
         title,
@@ -204,34 +181,17 @@ def plot_smoothing_sensitivity(
             connect_medians=connect_medians,
         )
 
-        ax.set_title(
-            title
-        )
+        ax.set_title(title)
 
-        ax.set_ylabel(
-            ylabel
-        )
+        ax.set_ylabel(ylabel)
 
-        ax.set_xlabel(
-            "Smoothing timescale (hours)"
-        )
+        ax.set_xlabel("Smoothing timescale (hours)")
 
-        ax.set_xscale(
-            "log"
-        )
+        ax.set_xscale("log")
 
-        ax.set_xticks(
-            horizons
-        )
+        ax.set_xticks(horizons)
 
-        ax.set_xticklabels(
-            [
-                _format_horizon(
-                    horizon
-                )
-                for horizon in horizons
-            ]
-        )
+        ax.set_xticklabels([_format_horizon(horizon) for horizon in horizons])
 
         ax.grid(
             axis="y",
@@ -253,10 +213,7 @@ def plot_smoothing_sensitivity(
     )
 
     if output_path is not None:
-
-        output_path = Path(
-            output_path
-        )
+        output_path = Path(output_path)
 
         output_path.parent.mkdir(
             parents=True,
@@ -297,14 +254,9 @@ def _plot_panel(
     """
 
     for method in methods:
+        method_data = data.loc[data["decomposition_method"] == method]
 
-        method_data = data.loc[
-            data["decomposition_method"] == method
-        ]
-
-        colour = method_colours[
-            method
-        ]
+        colour = method_colours[method]
 
         x_factor = 10 ** (
             METHOD_LOG10_OFFSETS.get(
@@ -321,40 +273,23 @@ def _plot_panel(
             "time_horizon_hours",
             sort=True,
         ):
-
-            values = (
-                subset[value_column]
-                .dropna()
-                .to_numpy(dtype=float)
-            )
+            values = subset[value_column].dropna().to_numpy(dtype=float)
 
             if len(values) == 0:
                 continue
 
-            position = (
-                float(horizon)
-                * x_factor
-            )
+            position = float(horizon) * x_factor
 
-            positions.append(
-                position
-            )
+            positions.append(position)
 
-            distributions.append(
-                values
-            )
+            distributions.append(values)
 
-            medians.append(
-                float(np.median(values))
-            )
+            medians.append(float(np.median(values)))
 
         if not distributions:
             continue
 
-        widths = [
-            position * BOX_WIDTH_FRACTION
-            for position in positions
-        ]
+        widths = [position * BOX_WIDTH_FRACTION for position in positions]
 
         ax.boxplot(
             distributions,
@@ -387,7 +322,6 @@ def _plot_panel(
         # Connecting medians makes the response to smoothing timescale
         # easier to follow without plotting the underlying observations.
         if connect_medians:
-
             ax.plot(
                 positions,
                 medians,
@@ -397,6 +331,8 @@ def _plot_panel(
                 markersize=3.5,
                 zorder=4,
             )
+
+
 # ---------------------------------------------------------------------------
 # Result extraction
 # ---------------------------------------------------------------------------
@@ -423,18 +359,10 @@ def _build_plot_data(
         "k_periods",
     }
 
-    missing = (
-        required_manifest_columns
-        - set(
-            manifest.columns
-        )
-    )
+    missing = required_manifest_columns - set(manifest.columns)
 
     if missing:
-        raise KeyError(
-            "Sensitivity manifest is missing columns: "
-            f"{sorted(missing)}"
-        )
+        raise KeyError(f"Sensitivity manifest is missing columns: {sorted(missing)}")
 
     data = manifest.loc[
         :,
@@ -451,24 +379,14 @@ def _build_plot_data(
         ],
     ].copy()
 
-    data = data.loc[
-        data["duration_years"] == 10
-    ].copy()
+    data = data.loc[data["duration_years"] == 10].copy()
 
     # Confirm that every case represented in the manifest is present in
     # consolidated parameters. This catches a forgotten consolidation step.
-    known_case_ids = set(
-        parameters[
-            "case_id"
-        ]
-    )
+    known_case_ids = set(parameters["case_id"])
 
     missing_parameters = [
-        case_id
-        for case_id in data[
-            "case_id"
-        ]
-        if case_id not in known_case_ids
+        case_id for case_id in data["case_id"] if case_id not in known_case_ids
     ]
 
     if missing_parameters:
@@ -483,31 +401,18 @@ def _build_plot_data(
     # -------------------------------------------------------------------
 
     metric_columns = {
-        "ldes_capacity_error_signed": (
-            "ldes_capacity_error"
-        ),
-        "macme_capex_weighted_annualised": (
-            "weighted_macme"
-        ),
+        "ldes_capacity_error_signed": ("ldes_capacity_error"),
+        "macme_capex_weighted_annualised": ("weighted_macme"),
     }
 
-    for metric_name, column_name in (
-        metric_columns.items()
-    ):
-
+    for metric_name, column_name in metric_columns.items():
         values = _investment_metric(
             investment_metrics,
-            case_ids=data[
-                "case_id"
-            ].tolist(),
+            case_ids=data["case_id"].tolist(),
             metric=metric_name,
         )
 
-        data[column_name] = (
-            data["case_id"]
-            .map(values)
-            * 100.0
-        )
+        data[column_name] = data["case_id"].map(values) * 100.0
 
     # -------------------------------------------------------------------
     # Clustered-v-reference SoC error
@@ -515,43 +420,27 @@ def _build_plot_data(
 
     soc_values = _signal_metric(
         signal_metrics,
-        case_ids=data[
-            "case_id"
-        ].tolist(),
+        case_ids=data["case_id"].tolist(),
         error_family="cem",
         signal_type="delta",
         metric="nrmse",
-        normalisation_basis=(
-            "reference_proxy_full_range"
-        ),
+        normalisation_basis=("reference_proxy_full_range"),
         window_half_width_days=None,
     )
 
     soc_proxy_values = _signal_metric(
-            signal_metrics,
-            case_ids=data[
-                "case_id"
-            ].tolist(),
-            error_family="reference_approximation",
-            signal_type="delta",
-            metric="nrmse",
-            normalisation_basis=(
-                "comparison_reference_full_range"
-            ),
-            window_half_width_days=None,
-        )
-
-    data["soc_nrmse"] = (
-        data["case_id"]
-        .map(soc_values)
-        * 100.0
+        signal_metrics,
+        case_ids=data["case_id"].tolist(),
+        error_family="reference_approximation",
+        signal_type="delta",
+        metric="nrmse",
+        normalisation_basis=("comparison_reference_full_range"),
+        window_half_width_days=None,
     )
 
-    data["soc_proxy_nrmse"] = (
-            data["case_id"]
-            .map(soc_proxy_values)
-            * 100.0
-        )
+    data["soc_nrmse"] = data["case_id"].map(soc_values) * 100.0
+
+    data["soc_proxy_nrmse"] = data["case_id"].map(soc_proxy_values) * 100.0
 
     return data
 
@@ -565,15 +454,7 @@ def _investment_metric(
     """Return one investment metric for every requested case."""
 
     selected = metrics.loc[
-        metrics[
-            "case_id"
-        ].isin(case_ids)
-        & (
-            metrics[
-                "metric"
-            ]
-            == metric
-        ),
+        metrics["case_id"].isin(case_ids) & (metrics["metric"] == metric),
         [
             "case_id",
             "value",
@@ -600,52 +481,21 @@ def _signal_metric(
     """Return one precisely defined signal metric for every case."""
 
     mask = (
-        metrics[
-            "case_id"
-        ].isin(case_ids)
-        & (
-            metrics[
-                "error_family"
-            ]
-            == error_family
-        )
-        & (
-            metrics[
-                "signal_type"
-            ]
-            == signal_type
-        )
-        & (
-            metrics[
-                "metric"
-            ]
-            == metric
-        )
+        metrics["case_id"].isin(case_ids)
+        & (metrics["error_family"] == error_family)
+        & (metrics["signal_type"] == signal_type)
+        & (metrics["metric"] == metric)
     )
 
     if normalisation_basis is None:
-        mask &= metrics[
-            "normalisation_basis"
-        ].isna()
+        mask &= metrics["normalisation_basis"].isna()
     else:
-        mask &= (
-            metrics[
-                "normalisation_basis"
-            ]
-            == normalisation_basis
-        )
+        mask &= metrics["normalisation_basis"] == normalisation_basis
 
     if window_half_width_days is None:
-        mask &= metrics[
-            "window_half_width_days"
-        ].isna()
+        mask &= metrics["window_half_width_days"].isna()
     else:
-        mask &= (
-            metrics[
-                "window_half_width_days"
-            ]
-            == window_half_width_days
-        )
+        mask &= metrics["window_half_width_days"] == window_half_width_days
 
     selected = metrics.loc[
         mask,
@@ -678,17 +528,9 @@ def _to_case_values(
 ) -> dict[str, float]:
     """Validate exactly one metric value per requested case."""
 
-    counts = (
-        selected
-        .groupby(
-            "case_id"
-        )
-        .size()
-    )
+    counts = selected.groupby("case_id").size()
 
-    duplicates = counts[
-        counts > 1
-    ]
+    duplicates = counts[counts > 1]
 
     if not duplicates.empty:
         raise RuntimeError(
@@ -697,27 +539,12 @@ def _to_case_values(
             f"{duplicates.index.tolist()}"
         )
 
-    values = (
-        selected
-        .set_index(
-            "case_id"
-        )[
-            "value"
-        ]
-        .to_dict()
-    )
+    values = selected.set_index("case_id")["value"].to_dict()
 
-    missing = [
-        case_id
-        for case_id in case_ids
-        if case_id not in values
-    ]
+    missing = [case_id for case_id in case_ids if case_id not in values]
 
     if missing:
-        raise KeyError(
-            f"Metric {description!r} is unavailable "
-            f"for case IDs: {missing}"
-        )
+        raise KeyError(f"Metric {description!r} is unavailable for case IDs: {missing}")
 
     return values
 
@@ -732,27 +559,16 @@ def _format_horizon(
 ) -> str:
     """Format one smoothing-timescale tick."""
 
-    hours = int(
-        hours
-    )
+    hours = int(hours)
 
     if hours >= 24 * 30:
-        return (
-            f"{hours}h\n"
-            f"({hours / (24 * 30):.0f}mo)"
-        )
+        return f"{hours}h\n({hours / (24 * 30):.0f}mo)"
 
     if hours >= 24 * 7:
-        return (
-            f"{hours}h\n"
-            f"({hours / (24 * 7):.0f}wk)"
-        )
+        return f"{hours}h\n({hours / (24 * 7):.0f}wk)"
 
     if hours >= 24:
-        return (
-            f"{hours}h\n"
-            f"({hours / 24:.0f}d)"
-        )
+        return f"{hours}h\n({hours / 24:.0f}d)"
 
     return f"{hours}h"
 
@@ -768,10 +584,7 @@ def _add_figure_legend(
     handles: list[Line2D] = []
 
     for method in methods:
-
-        colour = method_colours[
-            method
-        ]
+        colour = method_colours[method]
 
         handles.append(
             Line2D(
@@ -783,9 +596,7 @@ def _add_figure_legend(
                 markersize=8,
                 markerfacecolor=colour,
                 alpha=0.8,
-                label=METHOD_LABELS[
-                    method
-                ],
+                label=METHOD_LABELS[method],
             )
         )
 

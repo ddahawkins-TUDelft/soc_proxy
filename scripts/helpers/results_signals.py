@@ -75,6 +75,7 @@ def extract_storage_soc(
 
     return soc
 
+
 def extract_proxy_signal(
     proxy: pd.DataFrame,
     *,
@@ -480,8 +481,7 @@ def _align_reference_soc(
 
     if not (deltas == pd.Timedelta(hours=1)).all():
         raise RuntimeError(
-            "Reference alignment currently requires a regular hourly "
-            "target chronology."
+            "Reference alignment currently requires a regular hourly target chronology."
         )
 
     missing = target_index.difference(soc.index)
@@ -493,11 +493,7 @@ def _align_reference_soc(
             "present in the target chronology."
         )
 
-    resolution = (
-        model.inputs["timestep_resolution"]
-        .to_series()
-        .astype(float)
-    )
+    resolution = model.inputs["timestep_resolution"].to_series().astype(float)
     resolution.index = pd.DatetimeIndex(resolution.index)
 
     for timestamp in missing:
@@ -505,14 +501,10 @@ def _align_reference_soc(
         following = timestamp + pd.Timedelta(hours=1)
 
         if previous not in soc.index or following not in soc.index:
-            raise RuntimeError(
-                f"Cannot safely expand missing timestep {timestamp}."
-            )
+            raise RuntimeError(f"Cannot safely expand missing timestep {timestamp}.")
 
         if previous not in resolution.index:
-            raise RuntimeError(
-                f"No timestep resolution available before {timestamp}."
-            )
+            raise RuntimeError(f"No timestep resolution available before {timestamp}.")
 
         if not np.isclose(resolution.loc[previous], 2.0):
             raise RuntimeError(
@@ -529,14 +521,11 @@ def _align_reference_soc(
 
     if aligned.isna().any():
         raise RuntimeError(
-            "Reference SoC could not be safely expanded to the "
-            "target chronology."
+            "Reference SoC could not be safely expanded to the target chronology."
         )
 
     aligned.name = soc.name
-    aligned.attrs["chronology_alignment"] = (
-        "legacy_variable_timestep_expansion"
-    )
+    aligned.attrs["chronology_alignment"] = "legacy_variable_timestep_expansion"
     aligned.attrs["inserted_timesteps"] = len(missing)
 
     return aligned

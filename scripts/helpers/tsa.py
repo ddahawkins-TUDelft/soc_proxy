@@ -430,6 +430,7 @@ def _reconstruct_from_fixed_representatives(
     values.index = tsa_result.original.index
     return values
 
+
 def prepare_calliope_inputs(
     tsa_result: AggregationResult,
     calliope_timeseries: pd.DataFrame,
@@ -497,9 +498,7 @@ def prepare_calliope_inputs(
     if cluster_assignments is None:
         # Preserve the historical code path exactly when chronology remapping
         # is not requested.
-        reconstructed_timeseries = calliope_result.reconstructed[
-            target_columns
-        ].copy()
+        reconstructed_timeseries = calliope_result.reconstructed[target_columns].copy()
     else:
         reconstructed_timeseries = _reconstruct_from_fixed_representatives(
             calliope_result,
@@ -511,6 +510,7 @@ def prepare_calliope_inputs(
         cluster_map,
         reconstructed_timeseries,
     )
+
 
 def _build_representation(
     representation_params: dict[str, Any] | None,

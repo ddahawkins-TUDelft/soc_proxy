@@ -717,6 +717,7 @@ def _get_termination_condition(
 
     return None
 
+
 def calliope_runtime_seconds_from_timings(
     timings: Mapping[str, Any],
 ) -> float:
@@ -729,24 +730,16 @@ def calliope_runtime_seconds_from_timings(
 
     if missing:
         raise RuntimeError(
-            "Calliope runtime is missing required "
-            f"timings: {sorted(missing)}."
+            f"Calliope runtime is missing required timings: {sorted(missing)}."
         )
 
-    start = float(
-        timings["preprocess_start"]
-    )
-    end = float(
-        timings["solve_complete"]
-    )
+    start = float(timings["preprocess_start"])
+    end = float(timings["solve_complete"])
 
     runtime_seconds = end - start
 
     if runtime_seconds < 0:
-        raise RuntimeError(
-            "Calliope solve completion precedes "
-            "preprocessing start."
-        )
+        raise RuntimeError("Calliope solve completion precedes preprocessing start.")
 
     return runtime_seconds
 
@@ -761,9 +754,7 @@ def calliope_runtime_seconds(
         None,
     )
     if runtime is None:
-        raise RuntimeError(
-            "Calliope model has no runtime metadata."
-        )
+        raise RuntimeError("Calliope model has no runtime metadata.")
 
     timings = getattr(
         runtime,
@@ -771,9 +762,7 @@ def calliope_runtime_seconds(
         None,
     )
     if timings is None:
-        raise RuntimeError(
-            "Calliope runtime has no timing metadata."
-        )
+        raise RuntimeError("Calliope runtime has no timing metadata.")
 
     values = getattr(
         timings,
@@ -781,10 +770,6 @@ def calliope_runtime_seconds(
         None,
     )
     if values is None:
-        raise RuntimeError(
-            "Calliope runtime has no root timing data."
-        )
+        raise RuntimeError("Calliope runtime has no root timing data.")
 
-    return calliope_runtime_seconds_from_timings(
-        values
-    )
+    return calliope_runtime_seconds_from_timings(values)

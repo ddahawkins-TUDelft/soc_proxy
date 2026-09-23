@@ -111,9 +111,7 @@ def _resolve_country_assumptions(
     overrides = scenarios_config.get("overrides", {})
 
     if country not in scenarios:
-        raise ValueError(
-            f"No Calliope scenario is defined for country {country!r}."
-        )
+        raise ValueError(f"No Calliope scenario is defined for country {country!r}.")
 
     capacity_override = f"fixing_capacities_{country}"
 
@@ -126,9 +124,7 @@ def _resolve_country_assumptions(
         )
 
     if capacity_override not in overrides:
-        raise ValueError(
-            f"Calliope override {capacity_override!r} is not defined."
-        )
+        raise ValueError(f"Calliope override {capacity_override!r} is not defined.")
 
     try:
         nuclear = overrides[capacity_override]["techs"]["nuclear"]
@@ -141,14 +137,10 @@ def _resolve_country_assumptions(
         ) from exc
 
     if dispatchable_capacity < 0:
-        raise ValueError(
-            "Nuclear flow_cap_max cannot be negative."
-        )
+        raise ValueError("Nuclear flow_cap_max cannot be negative.")
 
     config.setdefault("calliope_params", {})
     config["calliope_params"]["scenario"] = country
 
     config.setdefault("soc_proxy_params", {})
-    config["soc_proxy_params"]["dispatchable_capacity"] = (
-        dispatchable_capacity
-    )
+    config["soc_proxy_params"]["dispatchable_capacity"] = dispatchable_capacity

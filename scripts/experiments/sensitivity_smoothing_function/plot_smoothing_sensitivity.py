@@ -8,10 +8,7 @@ from scripts.plots.smoothing_sensitivity_tukey import (
 
 
 plot_smoothing_sensitivity(
-    output_path=(
-        "results/figures/"
-        "smoothing_sensitivity.png"
-    ),
+    output_path=("results/figures/smoothing_sensitivity.png"),
 )
 
 plt.show()

@@ -97,10 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"{config['data_params']['start_date']} -> "
                 f"{config['data_params']['end_date']}"
             )
-            print(
-                "scenario:   "
-                f"{config.get('calliope_params', {}).get('scenario')}"
-            )
+            print(f"scenario:   {config.get('calliope_params', {}).get('scenario')}")
             print(f"timeseries: {source_path}")
             print(f"output:     {output_path}")
 
@@ -230,9 +227,7 @@ def _run_reference_model(
         )
 
     if model.results is None or not model.results.data_vars:
-        raise RuntimeError(
-            "Reference Calliope solve completed without model results."
-        )
+        raise RuntimeError("Reference Calliope solve completed without model results.")
 
     return model
 
@@ -280,14 +275,17 @@ def _validate_reference_inputs(
 
         if input_name not in model.inputs:
             raise RuntimeError(
-                f"Calliope dropped input {input_name!r} supplied for "
-                f"{node!r}/{tech!r}."
+                f"Calliope dropped input {input_name!r} supplied for {node!r}/{tech!r}."
             )
 
-        loaded = model.inputs[input_name].sel(
-            nodes=node,
-            techs=tech,
-        ).squeeze(drop=True)
+        loaded = (
+            model.inputs[input_name]
+            .sel(
+                nodes=node,
+                techs=tech,
+            )
+            .squeeze(drop=True)
+        )
 
         if set(loaded.dims) != {"timesteps"}:
             raise RuntimeError(
@@ -357,20 +355,13 @@ def _reference_model_path(
     if end <= start:
         raise ValueError("end_date must be later than start_date.")
 
-    if not (
-        start.month == 1
-        and start.day == 1
-        and end.month == 1
-        and end.day == 1
-    ):
+    if not (start.month == 1 and start.day == 1 and end.month == 1 and end.day == 1):
         raise ValueError(
             "Reference models currently require complete calendar-year "
             f"horizons; received [{start.date()}, {end.date()})."
         )
 
-    filename = (
-        f"standard_{start.year}_{end.year - 1}_reference_{country}.nc"
-    )
+    filename = f"standard_{start.year}_{end.year - 1}_reference_{country}.nc"
     return Path(reference_dir) / filename
 
 

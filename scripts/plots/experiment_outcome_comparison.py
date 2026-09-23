@@ -41,24 +41,16 @@ def plot_experiment_outcome_comparison(
         ``(fig, axes)``
     """
     if not case_ids:
-        raise ValueError(
-            "At least one case_id must be supplied."
-        )
+        raise ValueError("At least one case_id must be supplied.")
 
     case_ids = list(case_ids)
     results_dir = Path(results_dir)
 
-    parameters = pd.read_parquet(
-        results_dir / "parameters.parquet"
-    )
+    parameters = pd.read_parquet(results_dir / "parameters.parquet")
 
-    investment_metrics = pd.read_parquet(
-        results_dir / "investment_metrics.parquet"
-    )
+    investment_metrics = pd.read_parquet(results_dir / "investment_metrics.parquet")
 
-    signal_metrics = pd.read_parquet(
-        results_dir / "signal_metrics.parquet"
-    )
+    signal_metrics = pd.read_parquet(results_dir / "signal_metrics.parquet")
 
     labels = _experiment_labels(
         parameters,
@@ -107,9 +99,7 @@ def plot_experiment_outcome_comparison(
                 error_family="cem",
                 signal_type="level",
                 metric="nrmse",
-                normalisation_basis=(
-                    "reference_proxy_full_range"
-                ),
+                normalisation_basis=("reference_proxy_full_range"),
                 window_half_width_days=None,
             ),
             "SoC nRMSE (%)",
@@ -139,10 +129,7 @@ def plot_experiment_outcome_comparison(
         panels,
         strict=True,
     ):
-        y = [
-            values[case_id] * scale
-            for case_id in case_ids
-        ]
+        y = [values[case_id] * scale for case_id in case_ids]
 
         ax.plot(
             x,
@@ -164,10 +151,7 @@ def plot_experiment_outcome_comparison(
 
         ax.set_xticks(
             x,
-            [
-                labels[case_id]
-                for case_id in case_ids
-            ],
+            [labels[case_id] for case_id in case_ids],
             rotation=35,
             ha="right",
         )
@@ -208,11 +192,7 @@ def _experiment_labels(
         ],
     ].drop_duplicates()
 
-    duplicates = selected[
-        "case_id"
-    ].duplicated(
-        keep=False
-    )
+    duplicates = selected["case_id"].duplicated(keep=False)
 
     if duplicates.any():
         raise RuntimeError(
@@ -220,25 +200,12 @@ def _experiment_labels(
             "experiment names for the same case_id."
         )
 
-    labels = (
-        selected
-        .set_index("case_id")[
-            "experiment_name"
-        ]
-        .to_dict()
-    )
+    labels = selected.set_index("case_id")["experiment_name"].to_dict()
 
-    missing = [
-        case_id
-        for case_id in case_ids
-        if case_id not in labels
-    ]
+    missing = [case_id for case_id in case_ids if case_id not in labels]
 
     if missing:
-        raise KeyError(
-            "Case IDs not found in "
-            f"parameters.parquet: {missing}"
-        )
+        raise KeyError(f"Case IDs not found in parameters.parquet: {missing}")
 
     return labels
 
@@ -251,11 +218,7 @@ def _investment_metric(
     """Extract one investment metric per requested case."""
 
     selected = metrics.loc[
-        metrics["case_id"].isin(case_ids)
-        & (
-            metrics["metric"]
-            == metric
-        ),
+        metrics["case_id"].isin(case_ids) & (metrics["metric"] == metric),
         [
             "case_id",
             "value",
@@ -283,43 +246,20 @@ def _signal_metric(
 
     mask = (
         metrics["case_id"].isin(case_ids)
-        & (
-            metrics["error_family"]
-            == error_family
-        )
-        & (
-            metrics["signal_type"]
-            == signal_type
-        )
-        & (
-            metrics["metric"]
-            == metric
-        )
+        & (metrics["error_family"] == error_family)
+        & (metrics["signal_type"] == signal_type)
+        & (metrics["metric"] == metric)
     )
 
     if normalisation_basis is None:
-        mask &= metrics[
-            "normalisation_basis"
-        ].isna()
+        mask &= metrics["normalisation_basis"].isna()
     else:
-        mask &= (
-            metrics[
-                "normalisation_basis"
-            ]
-            == normalisation_basis
-        )
+        mask &= metrics["normalisation_basis"] == normalisation_basis
 
     if window_half_width_days is None:
-        mask &= metrics[
-            "window_half_width_days"
-        ].isna()
+        mask &= metrics["window_half_width_days"].isna()
     else:
-        mask &= (
-            metrics[
-                "window_half_width_days"
-            ]
-            == window_half_width_days
-        )
+        mask &= metrics["window_half_width_days"] == window_half_width_days
 
     selected = metrics.loc[
         mask,
@@ -352,15 +292,9 @@ def _to_case_values(
 ) -> dict[str, float]:
     """Validate and map one metric value to each case."""
 
-    counts = (
-        selected
-        .groupby("case_id")
-        .size()
-    )
+    counts = selected.groupby("case_id").size()
 
-    duplicates = counts[
-        counts > 1
-    ]
+    duplicates = counts[counts > 1]
 
     if not duplicates.empty:
         raise RuntimeError(
@@ -369,25 +303,11 @@ def _to_case_values(
             f"{duplicates.index.tolist()}"
         )
 
-    values = (
-        selected
-        .set_index("case_id")[
-            "value"
-        ]
-        .to_dict()
-    )
+    values = selected.set_index("case_id")["value"].to_dict()
 
-    missing = [
-        case_id
-        for case_id in case_ids
-        if case_id not in values
-    ]
+    missing = [case_id for case_id in case_ids if case_id not in values]
 
     if missing:
-        raise KeyError(
-            f"Metric {description!r} is "
-            "unavailable for case IDs: "
-            f"{missing}"
-        )
+        raise KeyError(f"Metric {description!r} is unavailable for case IDs: {missing}")
 
     return values

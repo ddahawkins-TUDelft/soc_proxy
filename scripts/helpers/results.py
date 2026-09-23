@@ -56,11 +56,7 @@ def generate_case_id(
     length: int = 16,
 ) -> str:
     """Generate a deterministic ID from the scientific case definition."""
-    definition = {
-        key: config[key]
-        for key in _CASE_CONFIG_KEYS
-        if key in config
-    }
+    definition = {key: config[key] for key in _CASE_CONFIG_KEYS if key in config}
 
     canonical = _canonicalise(definition)
 
@@ -146,6 +142,7 @@ def extract_case_results(
         signal_metrics=signal_metrics,
     )
 
+
 def record_case_results(
     config: dict,
     case,
@@ -216,10 +213,7 @@ def consolidate_results(
         if not paths:
             continue
 
-        frames = [
-            pd.read_parquet(path)
-            for path in paths
-        ]
+        frames = [pd.read_parquet(path) for path in paths]
 
         combined = pd.concat(
             frames,
@@ -258,9 +252,7 @@ def _atomic_to_parquet(
         exist_ok=True,
     )
 
-    temporary = path.with_name(
-        f".{path.stem}.{uuid4().hex}.tmp.parquet"
-    )
+    temporary = path.with_name(f".{path.stem}.{uuid4().hex}.tmp.parquet")
 
     try:
         frame.to_parquet(
@@ -281,16 +273,10 @@ def _atomic_to_parquet(
 def _canonicalise(value):
     """Convert configuration values into stable JSON-compatible values."""
     if isinstance(value, dict):
-        return {
-            str(key): _canonicalise(item)
-            for key, item in value.items()
-        }
+        return {str(key): _canonicalise(item) for key, item in value.items()}
 
     if isinstance(value, (list, tuple)):
-        return [
-            _canonicalise(item)
-            for item in value
-        ]
+        return [_canonicalise(item) for item in value]
 
     if isinstance(value, pd.Timestamp):
         return value.isoformat()

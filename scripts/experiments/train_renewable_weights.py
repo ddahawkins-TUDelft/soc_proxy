@@ -18,11 +18,7 @@ from scripts.pipeline import run_case
 # Settings
 # ---------------------------------------------------------------------------
 
-EXPERIMENT = (
-    sys.argv[1]
-    if len(sys.argv) > 1
-    else "NL_2010"
-)
+EXPERIMENT = sys.argv[1] if len(sys.argv) > 1 else "NL_2010"
 
 K_PERIODS = 20
 
@@ -81,25 +77,16 @@ def extract_renewable_capacities(
         & capacities["tech"].isin(RENEWABLE_TECHS)
     ]
 
-    values = (
-        renewable
-        .groupby("tech", observed=True)["value"]
-        .sum()
-        .to_dict()
-    )
+    values = renewable.groupby("tech", observed=True)["value"].sum().to_dict()
 
     missing = set(RENEWABLE_TECHS) - set(values)
 
     if missing:
         raise RuntimeError(
-            "Solved model is missing renewable capacities for: "
-            f"{sorted(missing)}"
+            f"Solved model is missing renewable capacities for: {sorted(missing)}"
         )
 
-    return {
-        tech: float(values[tech])
-        for tech in RENEWABLE_TECHS
-    }
+    return {tech: float(values[tech]) for tech in RENEWABLE_TECHS}
 
 
 def normalise(
@@ -110,14 +97,9 @@ def normalise(
     total = sum(values.values())
 
     if total <= 0:
-        raise ValueError(
-            "Renewable capacities/weights must sum to > 0."
-        )
+        raise ValueError("Renewable capacities/weights must sum to > 0.")
 
-    return {
-        tech: values[tech] / total
-        for tech in RENEWABLE_TECHS
-    }
+    return {tech: values[tech] / total for tech in RENEWABLE_TECHS}
 
 
 def relative_changes(
@@ -129,21 +111,13 @@ def relative_changes(
     changes: dict[str, float] = {}
 
     for tech in RENEWABLE_TECHS:
-
         old_value = float(old[tech])
         new_value = float(new[tech])
 
         if old_value == 0:
-            changes[tech] = (
-                0.0
-                if new_value == 0
-                else float("inf")
-            )
+            changes[tech] = 0.0 if new_value == 0 else float("inf")
         else:
-            changes[tech] = (
-                abs(new_value - old_value)
-                / abs(old_value)
-            )
+            changes[tech] = abs(new_value - old_value) / abs(old_value)
 
     return changes
 
@@ -155,10 +129,7 @@ def relaxed_update(
     """Blend current raw weights with the latest Calliope capacities."""
 
     return {
-        tech: (
-            (1.0 - RELAXATION) * old_weights[tech]
-            + RELAXATION * capacities[tech]
-        )
+        tech: ((1.0 - RELAXATION) * old_weights[tech] + RELAXATION * capacities[tech])
         for tech in RENEWABLE_TECHS
     }
 
@@ -169,8 +140,7 @@ def format_capacities(
     """Format renewable values in GW."""
 
     return " | ".join(
-        f"{tech}={values[tech] / 1000:7.2f} GW"
-        for tech in RENEWABLE_TECHS
+        f"{tech}={values[tech] / 1000:7.2f} GW" for tech in RENEWABLE_TECHS
     )
 
 
@@ -181,10 +151,7 @@ def format_shares(
 
     shares = normalise(values)
 
-    return " | ".join(
-        f"{tech}={shares[tech]:6.1%}"
-        for tech in RENEWABLE_TECHS
-    )
+    return " | ".join(f"{tech}={shares[tech]:6.1%}" for tech in RENEWABLE_TECHS)
 
 
 def format_duration(
@@ -202,11 +169,7 @@ def format_duration(
 
     hours, minutes = divmod(minutes, 60)
 
-    return (
-        f"{int(hours)}h "
-        f"{int(minutes)}m "
-        f"{seconds:.1f}s"
-    )
+    return f"{int(hours)}h {int(minutes)}m {seconds:.1f}s"
 
 
 def configure_weights(
@@ -216,33 +179,25 @@ def configure_weights(
     """Insert raw renewable weights into a resolved experiment config."""
 
     for tech in RENEWABLE_TECHS:
-        config["soc_proxy_params"]["renewables"][tech][
-            "weight"
-        ] = weights[tech]
+        config["soc_proxy_params"]["renewables"][tech]["weight"] = weights[tech]
 
 
 # ---------------------------------------------------------------------------
 # Load experiment
 # ---------------------------------------------------------------------------
 
-configs = load_experiment_config(
-    "config/experiment_config.yaml"
-)
+configs = load_experiment_config("config/experiment_config.yaml")
 
 if EXPERIMENT not in configs:
     raise KeyError(
-        f"Unknown experiment {EXPERIMENT!r}. "
-        f"Available experiments: {list(configs)}"
+        f"Unknown experiment {EXPERIMENT!r}. Available experiments: {list(configs)}"
     )
 
 base_config = configs[EXPERIMENT]
 
 country = base_config["data_params"]["country"]
 
-timeseries_path = (
-    "resources/raw_timeseries/"
-    f"time_varying_parameters_{country}.csv"
-)
+timeseries_path = f"resources/raw_timeseries/time_varying_parameters_{country}.csv"
 
 
 # ---------------------------------------------------------------------------
@@ -250,10 +205,7 @@ timeseries_path = (
 # ---------------------------------------------------------------------------
 
 # Deliberately uninformative initial renewable mix.
-weights = {
-    tech: 1.0
-    for tech in RENEWABLE_TECHS
-}
+weights = {tech: 1.0 for tech in RENEWABLE_TECHS}
 
 previous_capacities: dict[str, float] | None = None
 training_capacities: dict[str, float] | None = None
@@ -267,10 +219,7 @@ capacity_history: list[dict[str, float]] = []
 
 print()
 print("=" * 88)
-print(
-    f"Training renewable weights: "
-    f"{EXPERIMENT} / {country}"
-)
+print(f"Training renewable weights: {EXPERIMENT} / {country}")
 print(
     f"k={K_PERIODS}, "
     f"tolerance={CONVERGENCE_TOLERANCE:.1%}, "
@@ -290,7 +239,6 @@ training_start = perf_counter()
 # ---------------------------------------------------------------------------
 
 for iteration in range(1, MAX_RUNS + 1):
-
     config = deepcopy(base_config)
 
     config["tsa_params"]["k_periods"] = K_PERIODS
@@ -301,7 +249,6 @@ for iteration in range(1, MAX_RUNS + 1):
     # iterations, so weight convergence is evaluated under a stable proxy
     # formulation.
     if iteration <= 2:
-
         config["soc_proxy_params"]["margin_mode"] = "auto"
 
         config["soc_proxy_params"].pop(
@@ -312,18 +259,13 @@ for iteration in range(1, MAX_RUNS + 1):
         margin_description = "auto"
 
     else:
-
         if frozen_margin is None:
-            raise RuntimeError(
-                "Training margin was not frozen after run 2."
-            )
+            raise RuntimeError("Training margin was not frozen after run 2.")
 
         config["soc_proxy_params"]["margin_mode"] = "fixed"
         config["soc_proxy_params"]["margin_value"] = frozen_margin
 
-        margin_description = (
-            f"fixed {frozen_margin:.1%}"
-        )
+        margin_description = f"fixed {frozen_margin:.1%}"
 
     configure_weights(
         config,
@@ -335,20 +277,11 @@ for iteration in range(1, MAX_RUNS + 1):
     print(f"Run {iteration:02d}")
     print("-" * 88)
 
-    print(
-        "  Input weights:  "
-        + format_capacities(weights)
-    )
+    print("  Input weights:  " + format_capacities(weights))
 
-    print(
-        "  Input shares:   "
-        + format_shares(weights)
-    )
+    print("  Input shares:   " + format_shares(weights))
 
-    print(
-        f"  Margin mode:    "
-        f"{margin_description}"
-    )
+    print(f"  Margin mode:    {margin_description}")
 
     # -----------------------------------------------------------------------
     # Solve
@@ -362,61 +295,37 @@ for iteration in range(1, MAX_RUNS + 1):
         model_path="config/calliope/model.yaml",
     )
 
-    run_elapsed = (
-        perf_counter()
-        - run_start
-    )
+    run_elapsed = perf_counter() - run_start
 
-    training_run_times.append(
-        run_elapsed
-    )
+    training_run_times.append(run_elapsed)
 
     # -----------------------------------------------------------------------
     # Extract capacity result
     # -----------------------------------------------------------------------
 
-    capacities = extract_renewable_capacities(
-        result.calliope_model
-    )
+    capacities = extract_renewable_capacities(result.calliope_model)
 
-    capacity_history.append(
-        capacities.copy()
-    )
+    capacity_history.append(capacities.copy())
 
     training_capacities = capacities.copy()
 
-    selected_margin = (
-        result.tsa.original_proxy.margin
-    )
+    selected_margin = result.tsa.original_proxy.margin
 
     print()
-    print(
-        "  Capacities:     "
-        + format_capacities(capacities)
-    )
+    print("  Capacities:     " + format_capacities(capacities))
 
-    print(
-        "  Output shares:  "
-        + format_shares(capacities)
-    )
+    print("  Output shares:  " + format_shares(capacities))
 
-    print(
-        f"  Proxy margin:   "
-        f"{selected_margin:.1%}"
-    )
+    print(f"  Proxy margin:   {selected_margin:.1%}")
 
     # -----------------------------------------------------------------------
     # Freeze run-2 margin
     # -----------------------------------------------------------------------
 
     if iteration == 2:
-
         frozen_margin = selected_margin
 
-        print(
-            f"  Frozen margin:  "
-            f"{frozen_margin:.1%}"
-        )
+        print(f"  Frozen margin:  {frozen_margin:.1%}")
 
     # -----------------------------------------------------------------------
     # Capacity convergence
@@ -425,35 +334,22 @@ for iteration in range(1, MAX_RUNS + 1):
     max_change: float | None = None
 
     if previous_capacities is None:
-
-        print(
-            "  Capacity change: "
-            "n/a (first model solution)"
-        )
+        print("  Capacity change: n/a (first model solution)")
 
     else:
-
         changes = relative_changes(
             previous_capacities,
             capacities,
         )
 
-        max_change = max(
-            changes.values()
-        )
+        max_change = max(changes.values())
 
         print(
             "  Capacity change:"
-            + " | ".join(
-                f" {tech}={changes[tech]:6.1%}"
-                for tech in RENEWABLE_TECHS
-            )
+            + " | ".join(f" {tech}={changes[tech]:6.1%}" for tech in RENEWABLE_TECHS)
         )
 
-        print(
-            f"  Max change:      "
-            f"{max_change:.1%}"
-        )
+        print(f"  Max change:      {max_change:.1%}")
 
     # -----------------------------------------------------------------------
     # Determine whether training is complete
@@ -464,18 +360,11 @@ for iteration in range(1, MAX_RUNS + 1):
         and max_change is not None
         and max_change < CONVERGENCE_TOLERANCE
     ):
-
         converged = True
 
-        print(
-            f"  Converged:       "
-            f"yes (< {CONVERGENCE_TOLERANCE:.1%})"
-        )
+        print(f"  Converged:       yes (< {CONVERGENCE_TOLERANCE:.1%})")
 
-        print(
-            f"  Run time:        "
-            f"{format_duration(run_elapsed)}"
-        )
+        print(f"  Run time:        {format_duration(run_elapsed)}")
 
         del result
         gc.collect()
@@ -487,36 +376,23 @@ for iteration in range(1, MAX_RUNS + 1):
     # -----------------------------------------------------------------------
 
     if iteration == 1:
-
         # The initial 1:1:1 weights contain no useful capacity information.
         # Use the first model output directly for run 2.
         next_weights = capacities.copy()
 
     else:
-
         next_weights = relaxed_update(
             weights,
             capacities,
         )
 
-    print(
-        "  Next weights:   "
-        + format_capacities(next_weights)
-    )
+    print("  Next weights:   " + format_capacities(next_weights))
 
-    print(
-        "  Next shares:    "
-        + format_shares(next_weights)
-    )
+    print("  Next shares:    " + format_shares(next_weights))
 
-    print(
-        f"  Run time:        "
-        f"{format_duration(run_elapsed)}"
-    )
+    print(f"  Run time:        {format_duration(run_elapsed)}")
 
-    previous_capacities = (
-        capacities.copy()
-    )
+    previous_capacities = capacities.copy()
 
     weights = next_weights
 
@@ -524,10 +400,7 @@ for iteration in range(1, MAX_RUNS + 1):
     gc.collect()
 
 
-training_elapsed = (
-    perf_counter()
-    - training_start
-)
+training_elapsed = perf_counter() - training_start
 
 
 # ---------------------------------------------------------------------------
@@ -535,9 +408,7 @@ training_elapsed = (
 # ---------------------------------------------------------------------------
 
 if training_capacities is None:
-    raise RuntimeError(
-        "No training run completed successfully."
-    )
+    raise RuntimeError("No training run completed successfully.")
 
 
 print()
@@ -546,10 +417,7 @@ print("Final auto-margin pass")
 print("=" * 88)
 
 if converged:
-    print(
-        "Training converged. "
-        "Re-running once with endogenous margin selection."
-    )
+    print("Training converged. Re-running once with endogenous margin selection.")
 else:
     print(
         f"Training reached the {MAX_RUNS}-run safety limit. "
@@ -560,21 +428,13 @@ else:
 # Use the latest actual Calliope capacities directly as the proxy weights.
 #
 # We deliberately do not apply another relaxed update here.
-final_input_weights = (
-    training_capacities.copy()
-)
+final_input_weights = training_capacities.copy()
 
-final_config = deepcopy(
-    base_config
-)
+final_config = deepcopy(base_config)
 
-final_config["tsa_params"]["k_periods"] = (
-    K_PERIODS
-)
+final_config["tsa_params"]["k_periods"] = K_PERIODS
 
-final_config["soc_proxy_params"][
-    "margin_mode"
-] = "auto"
+final_config["soc_proxy_params"]["margin_mode"] = "auto"
 
 final_config["soc_proxy_params"].pop(
     "margin_value",
@@ -588,19 +448,11 @@ configure_weights(
 
 
 print()
-print(
-    "  Input weights:  "
-    + format_capacities(final_input_weights)
-)
+print("  Input weights:  " + format_capacities(final_input_weights))
 
-print(
-    "  Input shares:   "
-    + format_shares(final_input_weights)
-)
+print("  Input shares:   " + format_shares(final_input_weights))
 
-print(
-    "  Margin mode:    auto"
-)
+print("  Margin mode:    auto")
 
 
 final_start = perf_counter()
@@ -611,43 +463,22 @@ final_result = run_case(
     model_path="config/calliope/model.yaml",
 )
 
-final_elapsed = (
-    perf_counter()
-    - final_start
-)
+final_elapsed = perf_counter() - final_start
 
 
-final_capacities = (
-    extract_renewable_capacities(
-        final_result.calliope_model
-    )
-)
+final_capacities = extract_renewable_capacities(final_result.calliope_model)
 
-final_margin = (
-    final_result.tsa.original_proxy.margin
-)
+final_margin = final_result.tsa.original_proxy.margin
 
 
 print()
-print(
-    "  Capacities:     "
-    + format_capacities(final_capacities)
-)
+print("  Capacities:     " + format_capacities(final_capacities))
 
-print(
-    "  Output shares:  "
-    + format_shares(final_capacities)
-)
+print("  Output shares:  " + format_shares(final_capacities))
 
-print(
-    f"  Final margin:   "
-    f"{final_margin:.1%}"
-)
+print(f"  Final margin:   {final_margin:.1%}")
 
-print(
-    f"  Run time:       "
-    f"{format_duration(final_elapsed)}"
-)
+print(f"  Run time:       {format_duration(final_elapsed)}")
 
 
 # Compare the final auto-margin solve with the last training solution.
@@ -658,16 +489,10 @@ final_changes = relative_changes(
 
 print(
     "  Change from training:"
-    + " | ".join(
-        f" {tech}={final_changes[tech]:6.1%}"
-        for tech in RENEWABLE_TECHS
-    )
+    + " | ".join(f" {tech}={final_changes[tech]:6.1%}" for tech in RENEWABLE_TECHS)
 )
 
-print(
-    f"  Max final change: "
-    f"{max(final_changes.values()):.1%}"
-)
+print(f"  Max final change: {max(final_changes.values()):.1%}")
 
 
 del final_result
@@ -678,10 +503,7 @@ gc.collect()
 # Final report
 # ---------------------------------------------------------------------------
 
-overall_elapsed = (
-    perf_counter()
-    - overall_start
-)
+overall_elapsed = perf_counter() - overall_start
 
 
 print()
@@ -703,34 +525,20 @@ print(
 )
 
 print(
-    f"Frozen margin:    "
-    f"{frozen_margin:.1%}"
+    f"Frozen margin:    {frozen_margin:.1%}"
     if frozen_margin is not None
     else "Frozen margin:    n/a"
 )
 
-print(
-    f"Final margin:     "
-    f"{final_margin:.1%}"
-)
+print(f"Final margin:     {final_margin:.1%}")
 
-print(
-    f"Training time:    "
-    f"{format_duration(training_elapsed)}"
-)
+print(f"Training time:    {format_duration(training_elapsed)}")
 
-print(
-    f"Final-pass time:  "
-    f"{format_duration(final_elapsed)}"
-)
+print(f"Final-pass time:  {format_duration(final_elapsed)}")
 
-print(
-    f"Total time:       "
-    f"{format_duration(overall_elapsed)}"
-)
+print(f"Total time:       {format_duration(overall_elapsed)}")
 
 if training_run_times:
-
     print(
         f"Average training "
         f"run: {format_duration(sum(training_run_times) / len(training_run_times))}"
@@ -744,18 +552,13 @@ for i, capacities in enumerate(
     capacity_history,
     start=1,
 ):
-
-    print(
-        f"  Run {i:02d}: "
-        + format_capacities(capacities)
-    )
+    print(f"  Run {i:02d}: " + format_capacities(capacities))
 
 
 print()
 print("Final recommended weights:")
 
 for tech in RENEWABLE_TECHS:
-
     print(
         f"  {tech:<15}"
         f"{final_capacities[tech]:10.1f} MW "
@@ -766,13 +569,7 @@ for tech in RENEWABLE_TECHS:
 print()
 print("Normalised shares:")
 
-final_shares = normalise(
-    final_capacities
-)
+final_shares = normalise(final_capacities)
 
 for tech in RENEWABLE_TECHS:
-
-    print(
-        f"  {tech:<15}"
-        f"{final_shares[tech]:7.2%}"
-    )
+    print(f"  {tech:<15}{final_shares[tech]:7.2%}")

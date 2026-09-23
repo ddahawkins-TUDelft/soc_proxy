@@ -120,7 +120,7 @@ def extract_signal_metrics(
         tech=tech,
         target_index=reference_proxy.index,
     )
-    
+
     signals = _build_signals(
         reference_soc=reference_soc,
         clustered_soc=extract_storage_soc(
@@ -532,9 +532,7 @@ def _circular_rolling_mean(values: np.ndarray, window: int) -> np.ndarray:
 def _peak_index(values: np.ndarray, *, steps_per_day: int, smoothing_days: int) -> int:
     if smoothing_days < 0:
         raise ValueError("peak_smoothing_days must be >= 0.")
-    smoothed = _circular_rolling_mean(
-        values, max(1, smoothing_days * steps_per_day)
-    )
+    smoothed = _circular_rolling_mean(values, max(1, smoothing_days * steps_per_day))
     return int(np.nanargmax(smoothed))
 
 
@@ -562,7 +560,9 @@ def _peak_rows(
         "clustered_proxy": signals.clustered_proxy,
     }
     peaks = {
-        name: _peak_index(values, steps_per_day=steps_per_day, smoothing_days=smoothing_days)
+        name: _peak_index(
+            values, steps_per_day=steps_per_day, smoothing_days=smoothing_days
+        )
         for name, values in level_signals.items()
     }
     n = len(signals.index)

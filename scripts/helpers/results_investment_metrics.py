@@ -34,21 +34,14 @@ def calculate_investment_metrics(
         costs,
     )
 
-    case_ids = sorted(
-        set(capacities["case_id"])
-        | set(costs["case_id"])
-    )
+    case_ids = sorted(set(capacities["case_id"]) | set(costs["case_id"]))
 
     rows: list[dict[str, object]] = []
 
     for case_id in case_ids:
-        case_capacities = capacities.loc[
-            capacities["case_id"] == case_id
-        ].copy()
+        case_capacities = capacities.loc[capacities["case_id"] == case_id].copy()
 
-        case_costs = costs.loc[
-            costs["case_id"] == case_id
-        ].copy()
+        case_costs = costs.loc[costs["case_id"] == case_id].copy()
 
         rows.extend(
             _calculate_case_metrics(
@@ -73,87 +66,62 @@ def _calculate_case_metrics(
     ldes_tech: str,
 ) -> list[dict[str, object]]:
     """Calculate all investment metrics for one case."""
-    capacity_mix = _capacity_mix(
-        capacities
-    )
+    capacity_mix = _capacity_mix(capacities)
 
     metrics = {
-        "ldes_capacity_error_signed":
-            _ldes_capacity_error(
-                capacity_mix,
-                ldes_tech=ldes_tech,
-            ),
-
-        "macme":
-            _macme(
-                capacity_mix,
-            ),
-
-        "flow_capacity_nacd":
-            _capacity_nacd(
-                capacities,
-                capacity_type="flow_cap",
-            ),
-
-        "storage_capacity_nacd":
-            _capacity_nacd(
-                capacities,
-                capacity_type="storage_cap",
-            ),
-
-        "macme_capex_weighted_annualised":
-            _capex_weighted_macme(
-                capacity_mix,
-                costs,
-                cost_column="value",
-            ),
-
-        "macme_capex_weighted_unannualised":
-            _capex_weighted_macme(
-                capacity_mix,
-                costs,
-                cost_column="unannualised_value",
-            ),
-
-        "flow_capacity_mix_distance":
-            _capacity_mix_distance(
-                capacities,
-                capacity_type="flow_cap",
-            ),
-
-        "storage_capacity_mix_distance":
-            _capacity_mix_distance(
-                capacities,
-                capacity_type="storage_cap",
-            ),
-
-        "system_cost_error_signed":
-            _cost_error(
-                costs,
-                cost_class=None,
-                column="value",
-            ),
-
-        "capex_annualised_error_signed":
-            _cost_error(
-                costs,
-                cost_class="capex",
-                column="value",
-            ),
-
-        "capex_unannualised_error_signed":
-            _cost_error(
-                costs,
-                cost_class="capex",
-                column="unannualised_value",
-            ),
-
-        "opex_error_signed":
-            _cost_error(
-                costs,
-                cost_class="opex",
-                column="value",
-            ),
+        "ldes_capacity_error_signed": _ldes_capacity_error(
+            capacity_mix,
+            ldes_tech=ldes_tech,
+        ),
+        "macme": _macme(
+            capacity_mix,
+        ),
+        "flow_capacity_nacd": _capacity_nacd(
+            capacities,
+            capacity_type="flow_cap",
+        ),
+        "storage_capacity_nacd": _capacity_nacd(
+            capacities,
+            capacity_type="storage_cap",
+        ),
+        "macme_capex_weighted_annualised": _capex_weighted_macme(
+            capacity_mix,
+            costs,
+            cost_column="value",
+        ),
+        "macme_capex_weighted_unannualised": _capex_weighted_macme(
+            capacity_mix,
+            costs,
+            cost_column="unannualised_value",
+        ),
+        "flow_capacity_mix_distance": _capacity_mix_distance(
+            capacities,
+            capacity_type="flow_cap",
+        ),
+        "storage_capacity_mix_distance": _capacity_mix_distance(
+            capacities,
+            capacity_type="storage_cap",
+        ),
+        "system_cost_error_signed": _cost_error(
+            costs,
+            cost_class=None,
+            column="value",
+        ),
+        "capex_annualised_error_signed": _cost_error(
+            costs,
+            cost_class="capex",
+            column="value",
+        ),
+        "capex_unannualised_error_signed": _cost_error(
+            costs,
+            cost_class="capex",
+            column="unannualised_value",
+        ),
+        "opex_error_signed": _cost_error(
+            costs,
+            cost_class="opex",
+            column="value",
+        ),
     }
 
     return [
@@ -197,13 +165,9 @@ def _capacity_mix(
         )
 
         if key in storage_techs:
-            keep.append(
-                row.capacity_type == "storage_cap"
-            )
+            keep.append(row.capacity_type == "storage_cap")
         else:
-            keep.append(
-                row.capacity_type == "flow_cap"
-            )
+            keep.append(row.capacity_type == "flow_cap")
 
     mix = capacities.loc[
         keep,
@@ -268,13 +232,9 @@ def _ldes_capacity_error(
     ldes_tech: str,
 ) -> float:
     """Signed relative LDES capacity error."""
-    subset = capacity_mix.loc[
-        capacity_mix["tech"] == ldes_tech
-    ]
+    subset = capacity_mix.loc[capacity_mix["tech"] == ldes_tech]
 
-    paired = _paired_capacities(
-        subset
-    )
+    paired = _paired_capacities(subset)
 
     if len(paired) != 1:
         raise RuntimeError(
@@ -282,13 +242,9 @@ def _ldes_capacity_error(
             f"found {len(paired)}."
         )
 
-    reference = float(
-        paired["reference"].iloc[0]
-    )
+    reference = float(paired["reference"].iloc[0])
 
-    clustered = float(
-        paired["clustered"].iloc[0]
-    )
+    clustered = float(paired["clustered"].iloc[0])
 
     return _signed_relative_error(
         clustered,
@@ -301,19 +257,11 @@ def _macme(
     capacity_mix: pd.DataFrame,
 ) -> float:
     """Mean Absolute Capacity Mix Error."""
-    paired = _paired_capacities(
-        capacity_mix
-    )
+    paired = _paired_capacities(capacity_mix)
 
-    paired["clustered"] = (
-        paired["clustered"]
-        .fillna(0.0)
-    )
+    paired["clustered"] = paired["clustered"].fillna(0.0)
 
-    eligible = paired.loc[
-        paired["reference"].notna()
-        & (paired["reference"].abs() > 0)
-    ]
+    eligible = paired.loc[paired["reference"].notna() & (paired["reference"].abs() > 0)]
 
     if eligible.empty:
         raise RuntimeError(
@@ -321,17 +269,11 @@ def _macme(
             "are zero or missing."
         )
 
-    errors = (
-        (
-            eligible["clustered"]
-            - eligible["reference"]
-        ).abs()
-        / eligible["reference"].abs()
-    )
+    errors = (eligible["clustered"] - eligible["reference"]).abs() / eligible[
+        "reference"
+    ].abs()
 
-    return float(
-        errors.mean()
-    )
+    return float(errors.mean())
 
 
 def _capacity_nacd(
@@ -340,18 +282,11 @@ def _capacity_nacd(
     capacity_type: str,
 ) -> float:
     """Normalised absolute capacity deviation for one capacity type."""
-    subset = capacities.loc[
-        capacities["capacity_type"]
-        == capacity_type
-    ]
+    subset = capacities.loc[capacities["capacity_type"] == capacity_type]
 
-    paired = _paired_capacities(
-        subset
-    ).fillna(0.0)
+    paired = _paired_capacities(subset).fillna(0.0)
 
-    denominator = float(
-        paired["reference"].abs().sum()
-    )
+    denominator = float(paired["reference"].abs().sum())
 
     if np.isclose(
         denominator,
@@ -359,14 +294,7 @@ def _capacity_nacd(
     ):
         return np.nan
 
-    numerator = float(
-        (
-            paired["clustered"]
-            - paired["reference"]
-        )
-        .abs()
-        .sum()
-    )
+    numerator = float((paired["clustered"] - paired["reference"]).abs().sum())
 
     return numerator / denominator
 
@@ -378,35 +306,24 @@ def _capex_weighted_macme(
     cost_column: str,
 ) -> float:
     """MACME weighted by each technology's reference CAPEX."""
-    paired = _paired_capacities(
-        capacity_mix
-    )
+    paired = _paired_capacities(capacity_mix)
 
-    paired["clustered"] = (
-        paired["clustered"]
-        .fillna(0.0)
-    )
+    paired["clustered"] = paired["clustered"].fillna(0.0)
 
     eligible = paired.loc[
-        paired["reference"].notna()
-        & (paired["reference"].abs() > 0)
+        paired["reference"].notna() & (paired["reference"].abs() > 0)
     ].copy()
 
     if eligible.empty:
         return np.nan
 
     eligible["capacity_error"] = (
-        (
-            eligible["clustered"]
-            - eligible["reference"]
-        ).abs()
-        / eligible["reference"].abs()
-    )
+        eligible["clustered"] - eligible["reference"]
+    ).abs() / eligible["reference"].abs()
 
     reference_capex = (
         costs.loc[
-            (costs["model_type"] == "reference")
-            & (costs["cost_class"] == "capex"),
+            (costs["model_type"] == "reference") & (costs["cost_class"] == "capex"),
             [
                 "node",
                 "tech",
@@ -429,20 +346,13 @@ def _capex_weighted_macme(
     )
 
     eligible = eligible.join(
-        reference_capex.rename(
-            "weight_value"
-        ),
+        reference_capex.rename("weight_value"),
         how="left",
     )
 
-    eligible["weight_value"] = (
-        eligible["weight_value"]
-        .fillna(0.0)
-    )
+    eligible["weight_value"] = eligible["weight_value"].fillna(0.0)
 
-    denominator = float(
-        eligible["weight_value"].sum()
-    )
+    denominator = float(eligible["weight_value"].sum())
 
     if np.isclose(
         denominator,
@@ -450,17 +360,9 @@ def _capex_weighted_macme(
     ):
         return np.nan
 
-    weights = (
-        eligible["weight_value"]
-        / denominator
-    )
+    weights = eligible["weight_value"] / denominator
 
-    return float(
-        (
-            weights
-            * eligible["capacity_error"]
-        ).sum()
-    )
+    return float((weights * eligible["capacity_error"]).sum())
 
 
 def _capacity_mix_distance(
@@ -469,48 +371,22 @@ def _capacity_mix_distance(
     capacity_type: str,
 ) -> float:
     """Total-variation distance between reference and clustered capacity mix."""
-    subset = capacities.loc[
-        capacities["capacity_type"]
-        == capacity_type
-    ]
+    subset = capacities.loc[capacities["capacity_type"] == capacity_type]
 
-    paired = _paired_capacities(
-        subset
-    ).fillna(0.0)
+    paired = _paired_capacities(subset).fillna(0.0)
 
-    reference_total = float(
-        paired["reference"].sum()
-    )
+    reference_total = float(paired["reference"].sum())
 
-    clustered_total = float(
-        paired["clustered"].sum()
-    )
+    clustered_total = float(paired["clustered"].sum())
 
-    if (
-        np.isclose(reference_total, 0.0)
-        or np.isclose(clustered_total, 0.0)
-    ):
+    if np.isclose(reference_total, 0.0) or np.isclose(clustered_total, 0.0):
         return np.nan
 
-    reference_share = (
-        paired["reference"]
-        / reference_total
-    )
+    reference_share = paired["reference"] / reference_total
 
-    clustered_share = (
-        paired["clustered"]
-        / clustered_total
-    )
+    clustered_share = paired["clustered"] / clustered_total
 
-    return float(
-        0.5
-        * (
-            reference_share
-            - clustered_share
-        )
-        .abs()
-        .sum()
-    )
+    return float(0.5 * (reference_share - clustered_share).abs().sum())
 
 
 def _cost_error(
@@ -523,34 +399,16 @@ def _cost_error(
     subset = costs
 
     if cost_class is not None:
-        subset = subset.loc[
-            subset["cost_class"]
-            == cost_class
-        ]
+        subset = subset.loc[subset["cost_class"] == cost_class]
 
-    totals = (
-        subset
-        .groupby(
-            "model_type"
-        )[column]
-        .sum(
-            min_count=1
-        )
-    )
+    totals = subset.groupby("model_type")[column].sum(min_count=1)
 
-    if (
-        "reference" not in totals
-        or "clustered" not in totals
-    ):
+    if "reference" not in totals or "clustered" not in totals:
         return np.nan
 
-    reference = float(
-        totals["reference"]
-    )
+    reference = float(totals["reference"])
 
-    clustered = float(
-        totals["clustered"]
-    )
+    clustered = float(totals["clustered"])
 
     return _signed_relative_error(
         clustered,
@@ -574,10 +432,7 @@ def _signed_relative_error(
             f"{metric} is undefined because the reference value is zero."
         )
 
-    return (
-        estimate
-        - reference
-    ) / reference
+    return (estimate - reference) / reference
 
 
 def _validate_inputs(
@@ -604,25 +459,14 @@ def _validate_inputs(
         "unannualised_value",
     }
 
-    missing_capacities = (
-        required_capacities
-        - set(capacities.columns)
-    )
+    missing_capacities = required_capacities - set(capacities.columns)
 
-    missing_costs = (
-        required_costs
-        - set(costs.columns)
-    )
+    missing_costs = required_costs - set(costs.columns)
 
     if missing_capacities:
         raise ValueError(
-            "capacities is missing required columns: "
-            f"{sorted(missing_capacities)}"
+            f"capacities is missing required columns: {sorted(missing_capacities)}"
         )
 
     if missing_costs:
-        raise ValueError(
-            "costs is missing required columns: "
-            f"{sorted(missing_costs)}"
-        )
-    
+        raise ValueError(f"costs is missing required columns: {sorted(missing_costs)}")

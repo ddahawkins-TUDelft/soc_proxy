@@ -118,9 +118,7 @@ def prepare_tsam_proxy_chronology_inputs(
 
     representation = tsa_result.clustering.representation
     representation_name = (
-        representation.lower()
-        if isinstance(representation, str)
-        else None
+        representation.lower() if isinstance(representation, str) else None
     )
 
     cluster_ids = [int(cluster_id) for cluster_id in tsa_result.period_index]

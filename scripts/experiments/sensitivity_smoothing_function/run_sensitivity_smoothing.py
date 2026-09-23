@@ -35,20 +35,13 @@ BASE_CONFIG = Path("config/experiment_config.yaml")
 
 MODEL_PATH = Path("config/calliope/model.yaml")
 
-REFERENCE_DIR = Path(
-    "resources/calliope_models/reference"
-)
+REFERENCE_DIR = Path("resources/calliope_models/reference")
 
-TIMESERIES_DIR = Path(
-    "resources/raw_timeseries"
-)
+TIMESERIES_DIR = Path("resources/raw_timeseries")
 
 RESULTS_DIR = Path("results")
 
-MANIFEST_PATH = (
-    RESULTS_DIR
-    / "sensitivity_smoothing_manifest.parquet"
-)
+MANIFEST_PATH = RESULTS_DIR / "sensitivity_smoothing_manifest.parquet"
 
 
 COUNTRIES = (
@@ -155,21 +148,14 @@ def format_duration(
     )
 
     if minutes < 60:
-        return (
-            f"{int(minutes)}m "
-            f"{seconds:.1f}s"
-        )
+        return f"{int(minutes)}m {seconds:.1f}s"
 
     hours, minutes = divmod(
         minutes,
         60,
     )
 
-    return (
-        f"{int(hours)}h "
-        f"{int(minutes)}m "
-        f"{seconds:.1f}s"
-    )
+    return f"{int(hours)}h {int(minutes)}m {seconds:.1f}s"
 
 
 def discover_reference_cases() -> list[ReferenceCase]:
@@ -177,38 +163,22 @@ def discover_reference_cases() -> list[ReferenceCase]:
 
     cases: list[ReferenceCase] = []
 
-    for path in sorted(
-        REFERENCE_DIR.glob(
-            "standard_*_reference_*.nc"
-        )
-    ):
-        match = _REFERENCE_PATTERN.match(
-            path.name
-        )
+    for path in sorted(REFERENCE_DIR.glob("standard_*_reference_*.nc")):
+        match = _REFERENCE_PATTERN.match(path.name)
 
         if match is None:
             continue
 
-        country = match.group(
-            "country"
-        )
+        country = match.group("country")
 
         if country not in COUNTRIES:
             continue
 
-        start_year = int(
-            match.group("start")
-        )
+        start_year = int(match.group("start"))
 
-        end_year = int(
-            match.group("end")
-        )
+        end_year = int(match.group("end"))
 
-        duration_years = (
-            end_year
-            - start_year
-            + 1
-        )
+        duration_years = end_year - start_year + 1
 
         if duration_years not in HORIZON_YEARS:
             continue
@@ -225,8 +195,7 @@ def discover_reference_cases() -> list[ReferenceCase]:
 
     if not cases:
         raise RuntimeError(
-            "No 5- or 10-year NL/BE reference models "
-            f"found in {REFERENCE_DIR}."
+            f"No 5- or 10-year NL/BE reference models found in {REFERENCE_DIR}."
         )
 
     return cases
@@ -238,11 +207,7 @@ def country_template(
 ) -> dict:
     """Return a resolved experiment config to use as a country template."""
 
-    preferred = (
-        PREFERRED_TEMPLATE_EXPERIMENTS[
-            country
-        ]
-    )
+    preferred = PREFERRED_TEMPLATE_EXPERIMENTS[country]
 
     if preferred in configs:
         return configs[preferred]
@@ -250,17 +215,11 @@ def country_template(
     matches = [
         config
         for config in configs.values()
-        if (
-            config["data_params"]["country"]
-            == country
-        )
+        if (config["data_params"]["country"] == country)
     ]
 
     if not matches:
-        raise KeyError(
-            f"No experiment template found for "
-            f"country {country!r}."
-        )
+        raise KeyError(f"No experiment template found for country {country!r}.")
 
     return matches[0]
 
@@ -289,24 +248,15 @@ def experiment_name(
     if experiment_name participates in case hashing.
     """
 
-    label = method_label(
-        method
-    )
+    label = method_label(method)
 
     if reference.duration_years == 10:
         return (
-            f"{reference.country}_"
-            f"{reference.start_year}_"
-            f"{label}_"
-            f"{time_horizon_hours}h"
+            f"{reference.country}_{reference.start_year}_{label}_{time_horizon_hours}h"
         )
 
     return (
-        f"{reference.country}_"
-        f"{reference.start_year}_"
-        f"5y_"
-        f"{label}_"
-        f"{time_horizon_hours}h"
+        f"{reference.country}_{reference.start_year}_5y_{label}_{time_horizon_hours}h"
     )
 
 
@@ -318,48 +268,30 @@ def build_config(
 ) -> dict:
     """Build one fully resolved sensitivity configuration."""
 
-    config = deepcopy(
-        template
+    config = deepcopy(template)
+
+    config["experiment_name"] = experiment_name(
+        reference,
+        method,
+        time_horizon_hours,
     )
 
-    config["experiment_name"] = (
-        experiment_name(
-            reference,
-            method,
-            time_horizon_hours,
-        )
-    )
+    config["data_params"]["country"] = reference.country
 
-    config["data_params"][
-        "country"
-    ] = reference.country
+    config["data_params"]["start_date"] = reference.start_date
 
-    config["data_params"][
-        "start_date"
-    ] = reference.start_date
+    config["data_params"]["end_date"] = reference.end_date
 
-    config["data_params"][
-        "end_date"
-    ] = reference.end_date
+    config["tsa_params"]["k_periods"] = K_PERIODS
 
-    config["tsa_params"][
-        "k_periods"
-    ] = K_PERIODS
-
-    decomposition = (
-        config[
-            "soc_proxy_params"
-        ].setdefault(
-            "soc_decomposition",
-            {},
-        )
+    decomposition = config["soc_proxy_params"].setdefault(
+        "soc_decomposition",
+        {},
     )
 
     decomposition["method"] = method
 
-    decomposition[
-        "time_horizon_hours"
-    ] = time_horizon_hours
+    decomposition["time_horizon_hours"] = time_horizon_hours
 
     return config
 
@@ -370,12 +302,7 @@ def fragment_path(
 ) -> Path:
     """Return one per-case result-fragment path."""
 
-    return (
-        RESULTS_DIR
-        / "_fragments"
-        / fragment
-        / f"{case_id}.parquet"
-    )
+    return RESULTS_DIR / "_fragments" / fragment / f"{case_id}.parquet"
 
 
 def case_fragment_status(
@@ -415,24 +342,16 @@ def main(
         include_solver_output=False,
     )
 
-    base_configs = (
-        load_experiment_config(
-            BASE_CONFIG
-        )
-    )
+    base_configs = load_experiment_config(BASE_CONFIG)
 
-    references = (
-        discover_reference_cases()
-    )
+    references = discover_reference_cases()
 
     print()
     print("=" * 88)
     print("SoC Proxy smoothing sensitivity")
     print("=" * 88)
 
-    print(
-        f"Reference cases: {len(references)}"
-    )
+    print(f"Reference cases: {len(references)}")
 
     for reference in references:
         print(
@@ -443,35 +362,20 @@ def main(
             f"({reference.duration_years}y)"
         )
 
-    total_cases = (
-        len(references)
-        * len(METHODS)
-        * len(TIME_HORIZONS_HOURS)
-    )
+    total_cases = len(references) * len(METHODS) * len(TIME_HORIZONS_HOURS)
 
     print()
-    print(
-        f"Methods:         {len(METHODS)}"
-    )
+    print(f"Methods:         {len(METHODS)}")
 
-    print(
-        f"Time horizons:   "
-        f"{len(TIME_HORIZONS_HOURS)}"
-    )
+    print(f"Time horizons:   {len(TIME_HORIZONS_HOURS)}")
 
-    print(
-        f"k:               {K_PERIODS}"
-    )
+    print(f"k:               {K_PERIODS}")
 
-    print(
-        f"Total variants:  {total_cases}"
-    )
+    print(f"Total variants:  {total_cases}")
 
     print()
 
-    manifest_rows: list[
-        dict[str, object]
-    ] = []
+    manifest_rows: list[dict[str, object]] = []
 
     model_run_times: list[float] = []
 
@@ -483,18 +387,13 @@ def main(
     case_number = 0
 
     for reference in references:
-
         template = country_template(
             base_configs,
             reference.country,
         )
 
         for method in METHODS:
-
-            for time_horizon_hours in (
-                TIME_HORIZONS_HOURS
-            ):
-
+            for time_horizon_hours in TIME_HORIZONS_HOURS:
                 case_number += 1
 
                 config = build_config(
@@ -504,31 +403,18 @@ def main(
                     time_horizon_hours,
                 )
 
-                name = config[
-                    "experiment_name"
-                ]
+                name = config["experiment_name"]
 
-                case_id = generate_case_id(
-                    config
-                )
+                case_id = generate_case_id(config)
 
-                complete, missing = (
-                    case_fragment_status(
-                        case_id
-                    )
-                )
+                complete, missing = case_fragment_status(case_id)
 
                 print()
                 print("-" * 88)
 
-                print(
-                    f"[{case_number}/{total_cases}] "
-                    f"{name}"
-                )
+                print(f"[{case_number}/{total_cases}] {name}")
 
-                print(
-                    f"case_id: {case_id}"
-                )
+                print(f"case_id: {case_id}")
 
                 status = "pending"
                 run_seconds = 0.0
@@ -538,77 +424,50 @@ def main(
                 # ---------------------------------------------------------
 
                 if complete and not force:
-
                     reused_count += 1
                     status = "reused"
 
-                    print(
-                        "status:  complete fragments "
-                        "already exist; SKIPPING"
-                    )
+                    print("status:  complete fragments already exist; SKIPPING")
 
                 # ---------------------------------------------------------
                 # Dry-run only
                 # ---------------------------------------------------------
 
                 elif dry_run:
-
                     status = "would_run"
 
                     if missing:
                         print(
                             "status:  would run; "
-                            "missing fragments: "
-                            + ", ".join(missing)
+                            "missing fragments: " + ", ".join(missing)
                         )
                     else:
-                        print(
-                            "status:  would rerun "
-                            "(--force)"
-                        )
+                        print("status:  would rerun (--force)")
 
                 # ---------------------------------------------------------
                 # Execute case
                 # ---------------------------------------------------------
 
                 else:
-
                     if missing:
                         existing = [
                             fragment
-                            for fragment
-                            in REQUIRED_FRAGMENTS
-                            if fragment
-                            not in missing
+                            for fragment in REQUIRED_FRAGMENTS
+                            if fragment not in missing
                         ]
 
                         if existing:
-                            print(
-                                "status:  PARTIAL existing "
-                                "case; rerunning"
-                            )
+                            print("status:  PARTIAL existing case; rerunning")
 
-                            print(
-                                "existing: "
-                                + ", ".join(existing)
-                            )
+                            print("existing: " + ", ".join(existing))
 
-                            print(
-                                "missing:  "
-                                + ", ".join(missing)
-                            )
+                            print("missing:  " + ", ".join(missing))
 
-                    timeseries_path = (
-                        TIMESERIES_DIR
-                        / (
-                            "time_varying_parameters_"
-                            f"{reference.country}.csv"
-                        )
+                    timeseries_path = TIMESERIES_DIR / (
+                        f"time_varying_parameters_{reference.country}.csv"
                     )
 
-                    run_start = (
-                        perf_counter()
-                    )
+                    run_start = perf_counter()
 
                     result = run_case(
                         config,
@@ -616,29 +475,17 @@ def main(
                         model_path=MODEL_PATH,
                     )
 
-                    reference_model = (
-                        load_reference_model(
-                            config
-                        )
+                    reference_model = load_reference_model(config)
+
+                    recorded_case_id = record_case_results(
+                        config,
+                        result,
+                        reference_model,
                     )
 
-                    recorded_case_id = (
-                        record_case_results(
-                            config,
-                            result,
-                            reference_model,
-                        )
-                    )
+                    run_seconds = perf_counter() - run_start
 
-                    run_seconds = (
-                        perf_counter()
-                        - run_start
-                    )
-
-                    if (
-                        recorded_case_id
-                        != case_id
-                    ):
+                    if recorded_case_id != case_id:
                         raise RuntimeError(
                             "Generated and recorded "
                             "case IDs differ: "
@@ -648,11 +495,7 @@ def main(
 
                     # Confirm the result writer actually
                     # produced a complete case.
-                    complete_after, (
-                        missing_after
-                    ) = case_fragment_status(
-                        case_id
-                    )
+                    complete_after, (missing_after) = case_fragment_status(case_id)
 
                     if not complete_after:
                         raise RuntimeError(
@@ -664,23 +507,13 @@ def main(
                     executed_count += 1
                     status = "run"
 
-                    model_run_times.append(
-                        run_seconds
-                    )
+                    model_run_times.append(run_seconds)
 
-                    print(
-                        "status:  recorded"
-                    )
+                    print("status:  recorded")
 
-                    print(
-                        "margin:  "
-                        f"{result.tsa.original_proxy.margin:.1%}"
-                    )
+                    print(f"margin:  {result.tsa.original_proxy.margin:.1%}")
 
-                    print(
-                        "time:    "
-                        f"{format_duration(run_seconds)}"
-                    )
+                    print(f"time:    {format_duration(run_seconds)}")
 
                     del result
                     del reference_model
@@ -693,13 +526,9 @@ def main(
                         "country": reference.country,
                         "start_year": reference.start_year,
                         "end_year": reference.end_year,
-                        "duration_years": (
-                            reference.duration_years
-                        ),
+                        "duration_years": (reference.duration_years),
                         "decomposition_method": method,
-                        "time_horizon_hours": (
-                            time_horizon_hours
-                        ),
+                        "time_horizon_hours": (time_horizon_hours),
                         "k_periods": K_PERIODS,
                         "status": status,
                         "run_seconds": run_seconds,
@@ -710,9 +539,7 @@ def main(
     # Save manifest
     # ---------------------------------------------------------------------
 
-    manifest = pd.DataFrame(
-        manifest_rows
-    )
+    manifest = pd.DataFrame(manifest_rows)
 
     RESULTS_DIR.mkdir(
         parents=True,
@@ -729,9 +556,7 @@ def main(
     print("Sweep manifest")
     print("=" * 88)
 
-    print(
-        f"Saved: {MANIFEST_PATH}"
-    )
+    print(f"Saved: {MANIFEST_PATH}")
 
     if dry_run:
         return
@@ -747,42 +572,26 @@ def main(
 
     consolidate_results()
 
-    overall_seconds = (
-        perf_counter()
-        - overall_start
-    )
+    overall_seconds = perf_counter() - overall_start
 
     print()
     print("=" * 88)
     print("Sensitivity complete")
     print("=" * 88)
 
-    print(
-        f"Reused:       {reused_count}"
-    )
+    print(f"Reused:       {reused_count}")
 
-    print(
-        f"Executed:     {executed_count}"
-    )
+    print(f"Executed:     {executed_count}")
 
     if model_run_times:
-        print(
-            "Model time:   "
-            f"{format_duration(sum(model_run_times))}"
-        )
+        print(f"Model time:   {format_duration(sum(model_run_times))}")
 
         print(
             "Average/run:  "
-            f"{format_duration(
-                sum(model_run_times)
-                / len(model_run_times)
-            )}"
+            f"{format_duration(sum(model_run_times) / len(model_run_times))}"
         )
 
-    print(
-        "Total time:   "
-        f"{format_duration(overall_seconds)}"
-    )
+    print(f"Total time:   {format_duration(overall_seconds)}")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -800,17 +609,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--force",
         action="store_true",
-        help=(
-            "Rerun cases even if all required result "
-            "fragments already exist."
-        ),
+        help=("Rerun cases even if all required result fragments already exist."),
     )
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-
     args = _parse_args()
 
     main(

@@ -157,8 +157,7 @@ def generate_soc_proxy(
         weighted_cf += spec.weight * profiles[spec.field]
 
     capacity_factors = {
-        field: float(np.mean(profiles[field]))
-        for field in renewable_fields
+        field: float(np.mean(profiles[field])) for field in renewable_fields
     }
     capacity_factors["weighted_mean"] = float(np.mean(weighted_cf))
 
@@ -175,15 +174,13 @@ def generate_soc_proxy(
 
     base_gen = weighted_cf * base_renewable_capacity
 
-    c_star, lost_final, feasibility_evaluations = (
-        find_min_feasible_curtailment(
-            base_gen,
-            residual_demand,
-            storage_spec.charging_efficiency,
-            storage_spec.discharging_efficiency,
-            timestep_hours=timestep_hours,
-            tol=1e-12,
-        )
+    c_star, lost_final, feasibility_evaluations = find_min_feasible_curtailment(
+        base_gen,
+        residual_demand,
+        storage_spec.charging_efficiency,
+        storage_spec.discharging_efficiency,
+        timestep_hours=timestep_hours,
+        tol=1e-12,
     )
     if lost_final > 1e-9:
         raise RuntimeError(
@@ -233,8 +230,7 @@ def generate_soc_proxy(
     )
     if arrays.lost_load > 1e-8:
         raise RuntimeError(
-            "Selected margin unexpectedly produced lost load: "
-            f"{arrays.lost_load:.6g}."
+            f"Selected margin unexpectedly produced lost load: {arrays.lost_load:.6g}."
         )
 
     output = df.copy()
@@ -300,9 +296,7 @@ def _validate_verbosity(
 ) -> Literal["off", "info", "debug"]:
     """Validate the public console-verbosity setting."""
     if verbosity not in {"off", "info", "debug"}:
-        raise ValueError(
-            "verbosity must be one of 'off', 'info', or 'debug'."
-        )
+        raise ValueError("verbosity must be one of 'off', 'info', or 'debug'.")
     return cast(Literal["off", "info", "debug"], verbosity)
 
 
@@ -352,18 +346,13 @@ def _print_diagnostics(
                 "  adaptive extension:  "
                 + ("yes" if margin_diagnostics.sweep_extended else "no")
             )
+            print(f"  economic m80:        {margin_diagnostics.economic_margin_80:.1%}")
             print(
-                f"  economic m80:        "
-                f"{margin_diagnostics.economic_margin_80:.1%}"
-            )
-            print(
-                f"  terminal-event m:    "
-                f"{margin_diagnostics.terminal_event_margin:.1%}"
+                f"  terminal-event m:    {margin_diagnostics.terminal_event_margin:.1%}"
             )
             print(f"  selected:            {margin:.1%} ({reason})")
             print(
-                f"  terminal event:      "
-                f"{margin_diagnostics.terminal_event_timestamp}"
+                f"  terminal event:      {margin_diagnostics.terminal_event_timestamp}"
             )
             print(
                 f"  tail support:        "
@@ -379,9 +368,7 @@ def _print_diagnostics(
         print(f"  method:              {method}")
         print(f"  timescale:           {_format_hours(timescale)}")
         print(f"  timestep:            {_format_hours(timestep_hours)}")
-        print(
-            f"  LDES energy capacity:{_format_energy(ldes_energy_capacity):>12}"
-        )
+        print(f"  LDES energy capacity:{_format_energy(ldes_energy_capacity):>12}")
         print(f"  cycle residual:      {_format_energy(cycle_residual)}")
 
     fields = [
@@ -391,18 +378,11 @@ def _print_diagnostics(
         f"{method}/{_format_hours(timescale, compact=True)}",
     ]
 
-    if (
-        margin_diagnostics is not None
-        and margin_diagnostics.sweep_extended
-    ):
-        fields.append(
-            f"sweep→{margin_diagnostics.evaluated_margin_max:.0%}"
-        )
+    if margin_diagnostics is not None and margin_diagnostics.sweep_extended:
+        fields.append(f"sweep→{margin_diagnostics.evaluated_margin_max:.0%}")
 
     if abs(cycle_residual) > 1e4:
-        fields.append(
-            f"non-cyclic ΔE={_format_energy(cycle_residual)}"
-        )
+        fields.append(f"non-cyclic ΔE={_format_energy(cycle_residual)}")
 
     print(" | ".join(fields))
 
@@ -539,9 +519,7 @@ def _normalise_storage(storage: Mapping[str, float]) -> StorageSpec:
             "annualised_discharge_power_cost"
         ),
         charge_variable_cost=float(storage.get("charge_variable_cost", 0.0)),
-        discharge_variable_cost=float(
-            storage.get("discharge_variable_cost", 0.0)
-        ),
+        discharge_variable_cost=float(storage.get("discharge_variable_cost", 0.0)),
     )
 
 
@@ -595,26 +573,18 @@ def _regular_timestep_hours(
     chronology: pd.DatetimeIndex,
 ) -> float:
     if len(chronology) < 2:
-        raise ValueError(
-            "At least two timestamps are required."
-        )
+        raise ValueError("At least two timestamps are required.")
 
     deltas = chronology[1:] - chronology[:-1]
     timestep = deltas[0]
 
     if not np.all(deltas == timestep):
-        raise ValueError(
-            "Timeseries data must have a regular timestep."
-        )
+        raise ValueError("Timeseries data must have a regular timestep.")
 
-    hours = float(
-        timestep / pd.Timedelta(hours=1)
-    )
+    hours = float(timestep / pd.Timedelta(hours=1))
 
     if hours <= 0:
-        raise ValueError(
-            "Timeseries timestep must be positive."
-        )
+        raise ValueError("Timeseries timestep must be positive.")
 
     return hours
 
@@ -639,7 +609,4 @@ def _horizon_years(chronology: pd.DatetimeIndex) -> float:
     if years > 0 and start + pd.DateOffset(years=years) == represented_end:
         return float(years)
 
-    return float(
-        (represented_end - start).total_seconds()
-        / (365.2425 * 24.0 * 3600.0)
-    )
+    return float((represented_end - start).total_seconds() / (365.2425 * 24.0 * 3600.0))

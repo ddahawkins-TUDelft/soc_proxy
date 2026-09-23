@@ -50,10 +50,7 @@ def compute_soc_proxy(
 ) -> np.ndarray:
     """Integrate a storage-power delta signal into an energy SoC proxy."""
     timestep_hours = _positive_timestep_hours(timestep_hours)
-    return (
-        np.cumsum(np.asarray(surplus, dtype=np.float64))
-        * timestep_hours
-    )
+    return np.cumsum(np.asarray(surplus, dtype=np.float64)) * timestep_hours
 
 
 def allocate_circular_lifo(
@@ -334,9 +331,7 @@ def decompose_surplus(
     """Split storage deltas into LDES and SDES components."""
     surplus = np.asarray(surplus, dtype=np.float64)
     if surplus.shape != (plan.n,):
-        raise ValueError(
-            f"Expected surplus shape {(plan.n,)}, got {surplus.shape}."
-        )
+        raise ValueError(f"Expected surplus shape {(plan.n,)}, got {surplus.shape}.")
 
     if plan.method == "fft_lowpass":
         assert plan.fft_mask is not None
@@ -365,9 +360,7 @@ def build_proxy_arrays(
     decomposition_plan: DecompositionPlan,
 ) -> ProxyArrays:
     """Construct all proxy arrays for one already-chosen scaling factor."""
-    generation = np.asarray(base_gen, dtype=np.float64) / float(
-        curtailment_factor
-    )
+    generation = np.asarray(base_gen, dtype=np.float64) / float(curtailment_factor)
     residual = generation - demand
     positive = np.maximum(residual, 0.0)
     negative = np.maximum(-residual, 0.0)

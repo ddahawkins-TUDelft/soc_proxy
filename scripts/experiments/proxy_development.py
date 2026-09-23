@@ -13,7 +13,7 @@ from scripts.plots.multi_experiment_proxy_comparison import (
 from scripts.helpers.results import (
     record_case_results,
     consolidate_results,
-    generate_case_id
+    generate_case_id,
 )
 
 calliope.set_log_verbosity(
@@ -35,17 +35,16 @@ case_ids = []
 
 
 for experiment_name, config in configs.items():
-
     print(f"Running {experiment_name}")
 
-    case_id =  generate_case_id(config)
+    case_id = generate_case_id(config)
 
     check_path = Path(f"results/_fragments/parameters/{case_id}.parquet")
 
     if check_path.exists():
-        print('Case:', case_id, 'already exists. Skipping.')
-        
-    else: 
+        print("Case:", case_id, "already exists. Skipping.")
+
+    else:
         timeseries_path = (
             "resources/raw_timeseries/"
             f"time_varying_parameters_{config['data_params']['country']}.csv"
@@ -57,9 +56,7 @@ for experiment_name, config in configs.items():
             model_path="config/calliope/model.yaml",
         )
 
-        reference_model = load_reference_model(
-            config
-        )
+        reference_model = load_reference_model(config)
 
         case_id = record_case_results(
             config,
@@ -67,9 +64,7 @@ for experiment_name, config in configs.items():
             reference_model,
         )
 
-        print(
-            f"Recorded {experiment_name}: {case_id}"
-        )
+        print(f"Recorded {experiment_name}: {case_id}")
 
     case_ids.append(case_id)
 

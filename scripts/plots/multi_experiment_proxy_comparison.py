@@ -36,15 +36,9 @@ def plot_proxy_experiment_comparison(
 
     results_dir = Path(results_dir)
 
-    parameters = pd.read_parquet(
-        results_dir / "parameters.parquet"
-    )
-    investment_metrics = pd.read_parquet(
-        results_dir / "investment_metrics.parquet"
-    )
-    signal_metrics = pd.read_parquet(
-        results_dir / "signal_metrics.parquet"
-    )
+    parameters = pd.read_parquet(results_dir / "parameters.parquet")
+    investment_metrics = pd.read_parquet(results_dir / "investment_metrics.parquet")
+    signal_metrics = pd.read_parquet(results_dir / "signal_metrics.parquet")
 
     case_ids = list(case_ids)
 
@@ -139,10 +133,7 @@ def plot_proxy_experiment_comparison(
         panels,
         strict=True,
     ):
-        y = [
-            values[case_id] * scale
-            for case_id in case_ids
-        ]
+        y = [values[case_id] * scale for case_id in case_ids]
 
         ax.plot(
             x,
@@ -204,9 +195,7 @@ def _experiment_labels(
         ],
     ].drop_duplicates()
 
-    duplicates = selected["case_id"].duplicated(
-        keep=False
-    )
+    duplicates = selected["case_id"].duplicated(keep=False)
 
     if duplicates.any():
         raise RuntimeError(
@@ -214,21 +203,12 @@ def _experiment_labels(
             "for the same case_id."
         )
 
-    labels = selected.set_index(
-        "case_id"
-    )["experiment_name"].to_dict()
+    labels = selected.set_index("case_id")["experiment_name"].to_dict()
 
-    missing = [
-        case_id
-        for case_id in case_ids
-        if case_id not in labels
-    ]
+    missing = [case_id for case_id in case_ids if case_id not in labels]
 
     if missing:
-        raise KeyError(
-            "Case IDs not found in parameters.parquet: "
-            f"{missing}"
-        )
+        raise KeyError(f"Case IDs not found in parameters.parquet: {missing}")
 
     return labels
 
@@ -240,8 +220,7 @@ def _investment_metric(
 ) -> dict[str, float]:
     """Extract one investment metric for each requested case."""
     selected = metrics.loc[
-        metrics["case_id"].isin(case_ids)
-        & (metrics["metric"] == metric),
+        metrics["case_id"].isin(case_ids) & (metrics["metric"] == metric),
         [
             "case_id",
             "value",
@@ -274,24 +253,14 @@ def _signal_metric(
     )
 
     if normalisation_basis is None:
-        mask &= metrics[
-            "normalisation_basis"
-        ].isna()
+        mask &= metrics["normalisation_basis"].isna()
     else:
-        mask &= (
-            metrics["normalisation_basis"]
-            == normalisation_basis
-        )
+        mask &= metrics["normalisation_basis"] == normalisation_basis
 
     if window_half_width_days is None:
-        mask &= metrics[
-            "window_half_width_days"
-        ].isna()
+        mask &= metrics["window_half_width_days"].isna()
     else:
-        mask &= (
-            metrics["window_half_width_days"]
-            == window_half_width_days
-        )
+        mask &= metrics["window_half_width_days"] == window_half_width_days
 
     selected = metrics.loc[
         mask,
@@ -320,13 +289,9 @@ def _to_case_values(
     description: str,
 ) -> dict[str, float]:
     """Validate and map one metric value to each case."""
-    counts = selected.groupby(
-        "case_id"
-    ).size()
+    counts = selected.groupby("case_id").size()
 
-    duplicates = counts[
-        counts > 1
-    ]
+    duplicates = counts[counts > 1]
 
     if not duplicates.empty:
         raise RuntimeError(
@@ -334,20 +299,11 @@ def _to_case_values(
             f"{duplicates.index.tolist()}"
         )
 
-    values = selected.set_index(
-        "case_id"
-    )["value"].to_dict()
+    values = selected.set_index("case_id")["value"].to_dict()
 
-    missing = [
-        case_id
-        for case_id in case_ids
-        if case_id not in values
-    ]
+    missing = [case_id for case_id in case_ids if case_id not in values]
 
     if missing:
-        raise KeyError(
-            f"Metric {description!r} is unavailable for case IDs: "
-            f"{missing}"
-        )
+        raise KeyError(f"Metric {description!r} is unavailable for case IDs: {missing}")
 
     return values

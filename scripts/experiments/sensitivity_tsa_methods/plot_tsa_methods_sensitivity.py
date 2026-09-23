@@ -44,12 +44,8 @@ METHOD_ORDER = [
 METHOD_LABELS = {
     "hierarchical_medoid": "Hierarchical\n+ medoid",
     "kmeans_medoid": "k-means\n+ medoid",
-    "hierarchical_distribution_local": (
-        "Hierarchical\n+ distribution\n(local)"
-    ),
-    "hierarchical_distribution_global": (
-        "Hierarchical\n+ distribution\n(global)"
-    ),
+    "hierarchical_distribution_local": ("Hierarchical\n+ distribution\n(local)"),
+    "hierarchical_distribution_global": ("Hierarchical\n+ distribution\n(global)"),
     "hierarchical_distribution_minmax_local": (
         "Hierarchical\n+ distribution-minmax\n(local)"
     ),
@@ -92,9 +88,7 @@ METRICS = [
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Plot TSA-method sensitivity results."
-    )
+    parser = argparse.ArgumentParser(description="Plot TSA-method sensitivity results.")
     parser.add_argument(
         "--results-dir",
         type=Path,
@@ -106,8 +100,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help=(
-            "Output image path. Defaults to "
-            "<results-dir>/tsa_methods_sensitivity.png."
+            "Output image path. Defaults to <results-dir>/tsa_methods_sensitivity.png."
         ),
     )
     parser.add_argument(
@@ -157,14 +150,11 @@ def pivot_investment_metrics(investment: pd.DataFrame) -> pd.DataFrame:
             f"{duplicates.head(30).to_string(index=False)}"
         )
 
-    wide = (
-        investment.pivot(
-            index="case_id",
-            columns="metric",
-            values="value",
-        )
-        .reset_index()
-    )
+    wide = investment.pivot(
+        index="case_id",
+        columns="metric",
+        values="value",
+    ).reset_index()
     wide.columns.name = None
 
     require_columns(
@@ -207,24 +197,17 @@ def extract_soc_delta_nrmse(signals: pd.DataFrame) -> pd.DataFrame:
 
     # Use this additional flag when it exists in the schema.
     if "covers_full_horizon" in selected.columns:
-        selected = selected.loc[
-            selected["covers_full_horizon"].fillna(False)
-        ]
+        selected = selected.loc[selected["covers_full_horizon"].fillna(False)]
 
     duplicated = selected["case_id"].duplicated(keep=False)
     if duplicated.any():
-        duplicate_ids = sorted(
-            selected.loc[duplicated, "case_id"].astype(str).unique()
-        )
+        duplicate_ids = sorted(selected.loc[duplicated, "case_id"].astype(str).unique())
         raise ValueError(
             "Expected one full-horizon CEM delta nRMSE row per case, "
-            "but found duplicates for:\n"
-            + "\n".join(duplicate_ids[:20])
+            "but found duplicates for:\n" + "\n".join(duplicate_ids[:20])
         )
 
-    return selected[["case_id", "value"]].rename(
-        columns={"value": "soc_delta_nrmse"}
-    )
+    return selected[["case_id", "value"]].rename(columns={"value": "soc_delta_nrmse"})
 
 
 def infer_representation_scope(data: pd.DataFrame) -> pd.Series:
@@ -244,17 +227,15 @@ def infer_representation_scope(data: pd.DataFrame) -> pd.Series:
     experiment = data["experiment_name"].astype(str)
 
     scope = pd.Series("", index=data.index, dtype="object")
-    distribution_mask = representation.isin(
-        ["distribution", "distribution_minmax"]
+    distribution_mask = representation.isin(["distribution", "distribution_minmax"])
+
+    scope.loc[distribution_mask & experiment.str.contains("_local_", regex=False)] = (
+        "local"
     )
 
-    scope.loc[
-        distribution_mask & experiment.str.contains("_local_", regex=False)
-    ] = "local"
-
-    scope.loc[
-        distribution_mask & ~experiment.str.contains("_local_", regex=False)
-    ] = "global"
+    scope.loc[distribution_mask & ~experiment.str.contains("_local_", regex=False)] = (
+        "global"
+    )
 
     return scope
 
@@ -263,20 +244,16 @@ def build_method_column(data: pd.DataFrame) -> pd.Series:
     """Build plot method labels from clustering and representation settings."""
 
     cluster = data["cluster_method"].astype(str).str.lower()
-    representation = (
-        data["representation_method"].astype(str).str.lower()
-    )
+    representation = data["representation_method"].astype(str).str.lower()
     scope = infer_representation_scope(data)
 
     method = pd.Series("unsupported", index=data.index, dtype="object")
 
-    method.loc[
-        cluster.eq("hierarchical") & representation.eq("medoid")
-    ] = "hierarchical_medoid"
+    method.loc[cluster.eq("hierarchical") & representation.eq("medoid")] = (
+        "hierarchical_medoid"
+    )
 
-    method.loc[
-        cluster.eq("kmeans") & representation.eq("medoid")
-    ] = "kmeans_medoid"
+    method.loc[cluster.eq("kmeans") & representation.eq("medoid")] = "kmeans_medoid"
 
     method.loc[
         cluster.eq("hierarchical")
@@ -311,12 +288,8 @@ def load_results(results_dir: Path) -> pd.DataFrame:
     signal_path = results_dir / "signal_metrics.parquet"
 
     parameters = pd.read_parquet(parameters_path)
-    investment = pivot_investment_metrics(
-        pd.read_parquet(investment_path)
-    )
-    soc_delta = extract_soc_delta_nrmse(
-        pd.read_parquet(signal_path)
-    )
+    investment = pivot_investment_metrics(pd.read_parquet(investment_path))
+    soc_delta = extract_soc_delta_nrmse(pd.read_parquet(signal_path))
 
     require_columns(
         parameters,
@@ -389,15 +362,9 @@ def load_results(results_dir: Path) -> pd.DataFrame:
         )
 
     # Stored as fractions; convert to percentage-point values for display.
-    data["ldes_capacity_error_pct"] = (
-        100.0 * data["ldes_capacity_error_signed"]
-    )
-    data["macme_capex_weighted_pct"] = (
-        100.0 * data["macme_capex_weighted_annualised"]
-    )
-    data["soc_delta_nrmse_pct"] = (
-        100.0 * data["soc_delta_nrmse"]
-    )
+    data["ldes_capacity_error_pct"] = 100.0 * data["ldes_capacity_error_signed"]
+    data["macme_capex_weighted_pct"] = 100.0 * data["macme_capex_weighted_annualised"]
+    data["soc_delta_nrmse_pct"] = 100.0 * data["soc_delta_nrmse"]
 
     return data
 
@@ -409,11 +376,7 @@ def validate_experiment(data: pd.DataFrame) -> None:
     horizons = sorted(int(x) for x in data["horizon_start_year"].dropna().unique())
     ks = sorted(int(x) for x in data["k_periods"].dropna().unique())
     weights = sorted(float(x) for x in data["lambda_soc"].dropna().unique())
-    methods = [
-        method
-        for method in METHOD_ORDER
-        if method in set(data["method"])
-    ]
+    methods = [method for method in METHOD_ORDER if method in set(data["method"])]
 
     print("TSA sensitivity results")
     print("=======================")
@@ -426,14 +389,10 @@ def validate_experiment(data: pd.DataFrame) -> None:
 
     unknown_methods = set(data["method"]) - set(METHOD_ORDER)
     if unknown_methods:
-        raise ValueError(
-            f"Unexpected TSA methods: {sorted(unknown_methods)}"
-        )
+        raise ValueError(f"Unexpected TSA methods: {sorted(unknown_methods)}")
 
     if weights != WP_ORDER:
-        raise ValueError(
-            f"Expected proxy weights {WP_ORDER}, found {weights}."
-        )
+        raise ValueError(f"Expected proxy weights {WP_ORDER}, found {weights}.")
 
     plot_columns = [metric[0] for metric in METRICS]
     missing_counts = data[plot_columns].isna().sum()
@@ -449,10 +408,7 @@ def build_k_colours(k_values: list[int]) -> dict[int, tuple]:
     cmap = plt.get_cmap("plasma")
     positions = np.linspace(0.12, 0.88, len(k_values))
 
-    return {
-        k: cmap(position)
-        for k, position in zip(k_values, positions, strict=True)
-    }
+    return {k: cmap(position) for k, position in zip(k_values, positions, strict=True)}
 
 
 def build_k_offsets(
@@ -541,15 +497,13 @@ def plot_metric(
         method_x = method_positions[method]
 
         for wp in WP_ORDER:
-            wp_data = method_data.loc[
-                np.isclose(method_data["lambda_soc"], wp)
-            ]
+            wp_data = method_data.loc[np.isclose(method_data["lambda_soc"], wp)]
             wp_centre = method_x + WP_OFFSETS[wp]
 
             for k, colour in k_colours.items():
-                subset = wp_data.loc[
-                    wp_data["k_periods"].eq(k)
-                ].dropna(subset=[value_column])
+                subset = wp_data.loc[wp_data["k_periods"].eq(k)].dropna(
+                    subset=[value_column]
+                )
 
                 if subset.empty:
                     continue
@@ -558,10 +512,7 @@ def plot_metric(
 
                 xs = np.array(
                     [
-                        k_centre
-                        + replicate_jitter[
-                            (str(country), int(year))
-                        ]
+                        k_centre + replicate_jitter[(str(country), int(year))]
                         for country, year in zip(
                             subset["country"],
                             subset["horizon_start_year"],
@@ -655,9 +606,7 @@ def plot_metric(
 def make_figure(data: pd.DataFrame) -> plt.Figure:
     k_values = sorted(int(k) for k in data["k_periods"].unique())
     active_methods = [
-        method
-        for method in METHOD_ORDER
-        if method in set(data["method"])
+        method for method in METHOD_ORDER if method in set(data["method"])
     ]
 
     if not active_methods:
@@ -732,7 +681,7 @@ def make_figure(data: pd.DataFrame) -> plt.Figure:
         title="Representative periods",
         loc="upper center",
         bbox_to_anchor=(0.5, 0.946),
-        ncol=len(k_values)+1,
+        ncol=len(k_values) + 1,
         frameon=False,
         columnspacing=1.8,
         handletextpad=0.6,

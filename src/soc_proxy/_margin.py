@@ -127,15 +127,12 @@ def select_margin(
     )
 
     fixed_cost_rate = sum(
-        spec.weight * float(spec.annualised_capacity_cost)
-        for spec in renewables
+        spec.weight * float(spec.annualised_capacity_cost) for spec in renewables
     )
     variable_cost_profile = np.zeros(len(chronology), dtype=np.float64)
     for spec in renewables:
         variable_cost_profile += (
-            spec.weight
-            * renewable_profiles[spec.field]
-            * float(spec.variable_cost)
+            spec.weight * renewable_profiles[spec.field] * float(spec.variable_cost)
         )
 
     max_allowed_margin = _maximum_allowed_margin(c_star)
@@ -192,8 +189,7 @@ def select_margin(
 
     economic_margin = float(
         sweep.loc[
-            sweep["economic_saving_capture"]
-            >= _ECONOMIC_CAPTURE_TARGET - 1e-12,
+            sweep["economic_saving_capture"] >= _ECONOMIC_CAPTURE_TARGET - 1e-12,
             "margin",
         ].iloc[0]
     )
@@ -203,9 +199,7 @@ def select_margin(
     selected_margin = max(economic_margin, terminal_event_margin)
     selected = sweep.loc[np.isclose(sweep["margin"], selected_margin)]
     if len(selected) != 1:
-        raise RuntimeError(
-            f"Expected one selected-margin row, found {len(selected)}."
-        )
+        raise RuntimeError(f"Expected one selected-margin row, found {len(selected)}.")
     selected_row = selected.iloc[0]
 
     return MarginDiagnostics(
@@ -225,8 +219,7 @@ def select_margin(
         ),
         evaluated_margin_max=float(sweep["margin"].iloc[-1]),
         sweep_extended=bool(
-            float(sweep["margin"].iloc[-1])
-            > _INITIAL_MARGIN_MAX + 1e-12
+            float(sweep["margin"].iloc[-1]) > _INITIAL_MARGIN_MAX + 1e-12
         ),
         sweep=sweep,
     )
@@ -388,9 +381,7 @@ def _margin_sweep_is_resolved(sweep: pd.DataFrame) -> bool:
     safe_boundary = max_margin - confirmation_span
 
     economic_resolved = _minimum_cost_margin(sweep) <= safe_boundary + 1e-12
-    event_resolved = (
-        _first_terminal_event_margin(sweep) <= safe_boundary + 1e-12
-    )
+    event_resolved = _first_terminal_event_margin(sweep) <= safe_boundary + 1e-12
 
     return economic_resolved and event_resolved
 
@@ -427,10 +418,7 @@ def _proxy_system_annual_cost(
     """Price the proxy-implied VRE/LDES system for one candidate margin."""
     vre_fixed = total_renewable_capacity * fixed_renewable_cost_rate
 
-    charging_input = (
-        np.maximum(arrays.surplus, 0.0)
-        / storage.charging_efficiency
-    )
+    charging_input = np.maximum(arrays.surplus, 0.0) / storage.charging_efficiency
     positive_residual_demand = np.maximum(residual_demand, 0.0)
     background_surplus = np.maximum(-residual_demand, 0.0)
 
@@ -471,12 +459,10 @@ def _proxy_system_annual_cost(
     ldes = arrays.surplus_ldes
     storage_energy_capacity = float(np.ptp(arrays.soc_ldes))
     charge_power_input = (
-        float(np.max(np.maximum(ldes, 0.0)))
-        / storage.charging_efficiency
+        float(np.max(np.maximum(ldes, 0.0))) / storage.charging_efficiency
     )
     discharge_power_output = (
-        float(np.max(np.maximum(-ldes, 0.0)))
-        * storage.discharging_efficiency
+        float(np.max(np.maximum(-ldes, 0.0))) * storage.discharging_efficiency
     )
 
     annual_charge_input = (
@@ -493,12 +479,9 @@ def _proxy_system_annual_cost(
     )
 
     ldes_cost = (
-        storage_energy_capacity
-        * float(storage.annualised_energy_capacity_cost)
-        + charge_power_input
-        * float(storage.annualised_charge_power_cost)
-        + discharge_power_output
-        * float(storage.annualised_discharge_power_cost)
+        storage_energy_capacity * float(storage.annualised_energy_capacity_cost)
+        + charge_power_input * float(storage.annualised_charge_power_cost)
+        + discharge_power_output * float(storage.annualised_discharge_power_cost)
         + annual_charge_input * storage.charge_variable_cost
         + annual_discharge_output * storage.discharge_variable_cost
     )
@@ -520,8 +503,7 @@ def _add_frontier_diagnostics(sweep: pd.DataFrame) -> pd.DataFrame:
         out["ldes_range_relative_to_m0"] = np.nan
 
     out["interval_storage_saved_per_renewable_capacity"] = (
-        -out["ldes_range"].diff()
-        / out["total_renewable_capacity"].diff()
+        -out["ldes_range"].diff() / out["total_renewable_capacity"].diff()
     )
     return out
 
@@ -541,9 +523,7 @@ def _add_economic_capture(sweep: pd.DataFrame) -> pd.DataFrame:
     if maximum_saving <= 1e-12:
         out["economic_saving_capture"] = 1.0
     else:
-        out["economic_saving_capture"] = (
-            out["economic_saving_vs_m0"] / maximum_saving
-        )
+        out["economic_saving_capture"] = out["economic_saving_vs_m0"] / maximum_saving
 
     return out
 
@@ -575,10 +555,7 @@ def _terminal_event(
     max_margin = float(tail[-1]["margin"])
 
     def cluster_key(cluster: dict[str, object]) -> tuple[int, int, float]:
-        member_margins = [
-            float(member["margin"])
-            for member in cluster["members"]
-        ]
+        member_margins = [float(member["margin"]) for member in cluster["members"]]
         contains_max = int(
             any(np.isclose(value, max_margin) for value in member_margins)
         )
@@ -590,9 +567,7 @@ def _terminal_event(
         for member in selected["members"]
     ]
     timestamp_ns = np.asarray([value.value for value in timestamps], dtype=np.int64)
-    distance_sums = np.abs(timestamp_ns[:, None] - timestamp_ns[None, :]).sum(
-        axis=1
-    )
+    distance_sums = np.abs(timestamp_ns[:, None] - timestamp_ns[None, :]).sum(axis=1)
     terminal_timestamp = timestamps[int(np.argmin(distance_sums))]
     support = len(timestamps) / len(tail)
     return terminal_timestamp, float(support)
@@ -665,9 +640,7 @@ def _validate_auto_economics(
     storage: StorageSpec,
 ) -> None:
     missing_renewables = [
-        spec.field
-        for spec in renewables
-        if spec.annualised_capacity_cost is None
+        spec.field for spec in renewables if spec.annualised_capacity_cost is None
     ]
     if missing_renewables:
         raise ValueError(

@@ -275,9 +275,7 @@ def run_tsa_case(
             pgcr_inputs.target_delta,
             pgcr_inputs.representative_delta,
             pgcr_inputs.initial_cluster_map,
-            representative_period_indices=(
-                pgcr_inputs.representative_period_indices
-            ),
+            representative_period_indices=(pgcr_inputs.representative_period_indices),
             start_period=pgcr_params.get("start_period", "minimum"),
             lookahead_periods=pgcr_params.get("lookahead_periods", 7),
             max_sweeps=pgcr_params.get("max_sweeps", 3),

@@ -60,12 +60,7 @@ def fragment_path(
     case_id: str,
 ) -> Path:
     """Return the path of one per-case result fragment."""
-    return (
-        results_dir
-        / "_fragments"
-        / fragment
-        / f"{case_id}.parquet"
-    )
+    return results_dir / "_fragments" / fragment / f"{case_id}.parquet"
 
 
 def case_fragment_status(
@@ -97,15 +92,12 @@ def validate_unique_case_ids(
         names_by_case_id.setdefault(case_id, []).append(name)
 
     duplicates = {
-        case_id: names
-        for case_id, names in names_by_case_id.items()
-        if len(names) > 1
+        case_id: names for case_id, names in names_by_case_id.items() if len(names) > 1
     }
 
     if duplicates:
         details = "; ".join(
-            f"{case_id}: {', '.join(names)}"
-            for case_id, names in duplicates.items()
+            f"{case_id}: {', '.join(names)}" for case_id, names in duplicates.items()
         )
         raise RuntimeError(
             "Configuration contains duplicate scientific cases "
@@ -135,14 +127,11 @@ def select_cases(
         return [(experiment, configs[experiment])]
 
     if index is None:
-        raise RuntimeError(
-            "Internal error: no experiment selection was supplied."
-        )
+        raise RuntimeError("Internal error: no experiment selection was supplied.")
 
     if index < 0 or index >= len(items):
         raise IndexError(
-            f"Experiment index {index} is outside the valid range "
-            f"0..{len(items) - 1}."
+            f"Experiment index {index} is outside the valid range 0..{len(items) - 1}."
         )
 
     return [items[index]]
@@ -181,18 +170,9 @@ def run_one_case(
         f"{config['data_params']['end_date']}"
     )
     print(f"k:          {config['tsa_params']['k_periods']}")
-    print(
-        "WP:         "
-        f"{config['tsa_params']['soc_proxy']['lambda_soc']}"
-    )
-    print(
-        "cluster:    "
-        f"{config['tsa_params']['cluster']['method']}"
-    )
-    print(
-        "represent:  "
-        f"{config['tsa_params']['representation']['method']}"
-    )
+    print(f"WP:         {config['tsa_params']['soc_proxy']['lambda_soc']}")
+    print(f"cluster:    {config['tsa_params']['cluster']['method']}")
+    print(f"represent:  {config['tsa_params']['representation']['method']}")
 
     scope = config["tsa_params"]["representation"].get("scope")
     if scope is not None:
@@ -204,34 +184,24 @@ def run_one_case(
 
     if dry_run:
         if missing:
-            print(
-                "status:     would run; missing fragments: "
-                + ", ".join(missing)
-            )
+            print("status:     would run; missing fragments: " + ", ".join(missing))
         else:
             print("status:     would rerun (--force)")
         return case_id
 
     if missing:
         existing = [
-            fragment
-            for fragment in REQUIRED_FRAGMENTS
-            if fragment not in missing
+            fragment for fragment in REQUIRED_FRAGMENTS if fragment not in missing
         ]
         if existing:
             print("status:     PARTIAL existing case; rerunning")
             print("existing:   " + ", ".join(existing))
             print("missing:    " + ", ".join(missing))
 
-    timeseries_path = (
-        timeseries_dir
-        / f"time_varying_parameters_{country}.csv"
-    )
+    timeseries_path = timeseries_dir / f"time_varying_parameters_{country}.csv"
 
     if not timeseries_path.is_file():
-        raise FileNotFoundError(
-            f"Input timeseries does not exist: {timeseries_path}"
-        )
+        raise FileNotFoundError(f"Input timeseries does not exist: {timeseries_path}")
 
     # Cheap preflight before starting the optimisation.
     reference_path = resolve_reference_model_path(config)
@@ -256,8 +226,7 @@ def run_one_case(
 
     if recorded_case_id != case_id:
         raise RuntimeError(
-            "Generated and recorded case IDs differ: "
-            f"{case_id} != {recorded_case_id}"
+            f"Generated and recorded case IDs differ: {case_id} != {recorded_case_id}"
         )
 
     complete_after, missing_after = case_fragment_status(
@@ -267,17 +236,13 @@ def run_one_case(
 
     if not complete_after:
         raise RuntimeError(
-            "Case completed but required result fragments are missing: "
-            f"{missing_after}"
+            f"Case completed but required result fragments are missing: {missing_after}"
         )
 
     elapsed = perf_counter() - start
 
     print("status:     recorded")
-    print(
-        "margin:     "
-        f"{result.tsa.original_proxy.margin:.1%}"
-    )
+    print(f"margin:     {result.tsa.original_proxy.margin:.1%}")
     print(f"wall time:  {format_duration(elapsed)}")
 
     del result
@@ -332,10 +297,7 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help=(
-            "Rerun selected cases even if all required fragments "
-            "already exist."
-        ),
+        help=("Rerun selected cases even if all required fragments already exist."),
     )
 
     parser.add_argument(
