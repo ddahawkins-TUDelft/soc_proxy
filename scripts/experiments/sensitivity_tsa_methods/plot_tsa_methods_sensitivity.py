@@ -47,10 +47,10 @@ METHOD_LABELS = {
     "hierarchical_distribution_local": ("Hierarchical\n+ distribution\n(local)"),
     "hierarchical_distribution_global": ("Hierarchical\n+ distribution\n(global)"),
     "hierarchical_distribution_minmax_local": (
-        "Hierarchical\n+ distribution-minmax\n(local)"
+        "Hierarchical\n+ distribution\nminmax\n(local)"
     ),
     "hierarchical_distribution_minmax_global": (
-        "Hierarchical\n+ distribution-minmax\n(global)"
+        "Hierarchical\n+ distribution\nminmax\n(global)"
     ),
 }
 
