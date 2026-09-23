@@ -251,6 +251,26 @@ def run_tsa_case(
             proxy_column_name=target_field_name,
         )
 
+        def exact_delta_evaluator(candidate_map):
+            """Evaluate the physical proxy implied by one candidate PGCR map."""
+            _, candidate_timeseries = prepare_calliope_inputs(
+                tsa_result,
+                timeseries,
+                cluster_assignments=candidate_map,
+            )
+
+            candidate_proxy = _generate_proxy(
+                candidate_timeseries,
+                {
+                    **soc_proxy_params,
+                    "margin_mode": "fixed",
+                    "margin_value": original_proxy.margin,
+                    "verbosity": "off",
+                },
+            )
+
+            return candidate_proxy.data[target_field_name]
+
         proxy_chronology_result = greedy_proxy_chronology_remap(
             pgcr_inputs.target_delta,
             pgcr_inputs.representative_delta,
@@ -266,6 +286,7 @@ def run_tsa_case(
                 "stop_changed_fraction",
                 0.0,
             ),
+            exact_delta_evaluator=exact_delta_evaluator,
         )
 
         # Re-run only the transfer/finalisation helper. It freezes TSAM's
