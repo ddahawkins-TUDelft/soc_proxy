@@ -1,0 +1,2081 @@
+# Paper experiment batch: 10-year TSA sensitivity
+#
+# Design:
+#   5 overlapping 10-year weather horizons
+#   8 representative-period counts: k = 10, 20, 30, 40, 50, 60, 90, 180
+#   5 proxy weights: WP = 0, 0.25, 0.5, 0.75, 1
+#   TSA method fixed in defaults: hierarchical + medoid
+#
+# Total: 200 cases.
+
+defaults:
+  dispatch_mode: tsa
+
+  data_params:
+    country: NL
+    start_date: 2010-01-01
+    end_date: 2020-01-01
+
+  soc_proxy_params:
+    demand_field: demand_power
+
+    renewables:
+      solar:
+        weight: 0.56
+        annualised_capacity_cost: 0.069366234867
+        variable_cost: 0.0
+
+      onshore_wind:
+        weight: 0.2
+        annualised_capacity_cost: 0.136565982927
+        variable_cost: 0.000002
+
+      offshore_wind:
+        weight: 0.24
+        annualised_capacity_cost: 0.279506201625
+        variable_cost: 0.000005
+
+    storage:
+      charging_efficiency: 0.6435
+      discharging_efficiency: 0.5544
+      annualised_energy_capacity_cost: 0.000319023150
+      annualised_charge_power_cost: 0.101531096308
+      annualised_discharge_power_cost: 0.134273315570
+      charge_variable_cost: 0.0
+      discharge_variable_cost: 0.000068964714
+
+    soc_decomposition:
+      method: gaussian
+      time_horizon_hours: 24
+
+    margin_mode: auto
+
+  tsa_params:
+    k_periods: 40
+    period_duration: 1D
+    preserve_column_means: true
+
+    soc_proxy:
+      enabled: true
+      lambda_soc: 0.5
+      proxy_field_name: surplus_LDES
+
+    cluster:
+      method: hierarchical
+      random_state: 42
+
+    representation:
+      method: medoid
+
+  calliope_params: {}
+
+  solver_params:
+    solver: gurobi
+    solver_options:
+      NumericFocus: 2
+
+  output_params:
+    save_capacities: true
+    save_costs: true
+    save_metrics: true
+
+experiments:
+  NL_2006_k10_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k10_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k10_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k10_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k10_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k20_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k20_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k20_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k20_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k20_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k30_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k30_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k30_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k30_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k30_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k40_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k40_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k40_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k40_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k40_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k50_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k50_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k50_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k50_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k50_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k60_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k60_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k60_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k60_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k60_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k90_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k90_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k90_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k90_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k90_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2006_k180_wp0:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2006_k180_wp025:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2006_k180_wp05:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2006_k180_wp075:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2006_k180_wp1:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k10_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k10_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k10_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k10_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k10_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k20_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k20_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k20_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k20_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k20_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k30_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k30_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k30_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k30_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k30_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k40_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k40_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k40_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k40_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k40_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k50_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k50_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k50_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k50_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k50_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k60_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k60_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k60_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k60_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k60_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k90_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k90_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k90_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k90_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k90_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2008_k180_wp0:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2008_k180_wp025:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2008_k180_wp05:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2008_k180_wp075:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2008_k180_wp1:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k10_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k10_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k10_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k10_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k10_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k20_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k20_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k20_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k20_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k20_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k30_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k30_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k30_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k30_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k30_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k40_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k40_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k40_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k40_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k40_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k50_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k50_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k50_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k50_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k50_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k60_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k60_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k60_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k60_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k60_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k90_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k90_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k90_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k90_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k90_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2010_k180_wp0:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2010_k180_wp025:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2010_k180_wp05:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2010_k180_wp075:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2010_k180_wp1:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k10_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k10_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k10_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k10_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k10_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k20_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k20_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k20_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k20_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k20_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k30_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k30_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k30_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k30_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k30_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k40_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k40_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k40_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k40_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k40_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k50_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k50_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k50_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k50_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k50_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k60_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k60_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k60_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k60_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k60_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k90_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k90_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k90_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k90_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k90_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2012_k180_wp0:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2012_k180_wp025:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2012_k180_wp05:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2012_k180_wp075:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2012_k180_wp1:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k10_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k10_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k10_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k10_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k10_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 10
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k20_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k20_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k20_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k20_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k20_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 20
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k30_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k30_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k30_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k30_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k30_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 30
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k40_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k40_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k40_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k40_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k40_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 40
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k50_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k50_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k50_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k50_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k50_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 50
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k60_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k60_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k60_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k60_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k60_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 60
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k90_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k90_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k90_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k90_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k90_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 90
+      soc_proxy:
+        lambda_soc: 1
+
+  NL_2014_k180_wp0:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0
+
+  NL_2014_k180_wp025:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.25
+
+  NL_2014_k180_wp05:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.5
+
+  NL_2014_k180_wp075:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 0.75
+
+  NL_2014_k180_wp1:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+
+    tsa_params:
+      k_periods: 180
+      soc_proxy:
+        lambda_soc: 1
