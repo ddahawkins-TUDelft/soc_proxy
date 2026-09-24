@@ -42,7 +42,8 @@ WP_ORDER = [0.0, 0.25, 0.5, 0.75, 1.0]
 METRICS = [
     ("ldes_capacity_error_pct", "(a) LDES capacity error", "Capacity error (%)"),
     ("macme_capex_weighted_pct", "(b) CAPEX-weighted MACME", "Weighted MACME (%)"),
-    ("soc_delta_nrmse_pct", "(c) CEM SoC-delta error", "SoC delta nRMSE (%)"),
+    # ("soc_delta_nrmse_pct", "(c) CEM SoC-delta error", "SoC delta nRMSE (%)"),
+    ("ldes_abs_error_improvement_pp","(c) Improvement in LDES capacity error","Reduction in absolute capacity error (pp)"),
     ("runtime_method_seconds", "(d) Workflow runtime", "Runtime (s)"),
 ]
 
@@ -277,6 +278,51 @@ def load_results(results_dir: Path, country: str) -> pd.DataFrame:
         100.0 * data["macme_capex_weighted_annualised"]
     )
     data["soc_delta_nrmse_pct"] = 100.0 * data["soc_delta_nrmse"]
+
+    # Pair each proxy-weight case with its otherwise-identical W_P = 0 case.
+    pair_columns = [
+        "country",
+        "start_date",
+        "end_date",
+        "k_periods",
+    ]
+
+    baseline = (
+        data.loc[
+            np.isclose(data["lambda_soc"], 0.0),
+            pair_columns + ["ldes_capacity_error_pct"],
+        ]
+        .rename(
+            columns={
+                "ldes_capacity_error_pct":
+                    "ldes_capacity_error_baseline_pct"
+            }
+        )
+    )
+
+    data = data.merge(
+        baseline,
+        on=pair_columns,
+        how="left",
+        validate="many_to_one",
+    )
+
+    # Positive = closer to zero than W_P = 0.
+    # Negative = further from zero than W_P = 0.
+    data["ldes_abs_error_improvement_pp"] = (
+        data["ldes_capacity_error_baseline_pct"].abs()
+        - data["ldes_capacity_error_pct"].abs()
+    )
+
+    # Optional diagnostic: did the investment error cross zero?
+    data["ldes_crossed_reference"] = (
+        ~np.isclose(data["lambda_soc"], 0.0)
+        & ~np.isclose(data["ldes_capacity_error_baseline_pct"], 0.0)
+        & (
+            np.sign(data["ldes_capacity_error_baseline_pct"])
+            != np.sign(data["ldes_capacity_error_pct"])
+        )
+    )
 
     return data
 
