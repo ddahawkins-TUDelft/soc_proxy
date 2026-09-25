@@ -384,7 +384,7 @@ def build_wp_colours(weights: list[float]) -> dict[float, object]:
 def build_wp_offsets(
     weights: list[float],
     *,
-    width: float = 0.46,
+    width: float = 0.6,
 ) -> dict[float, float]:
     """Give each proxy weight a stable sub-position within one k category."""
     if len(weights) == 1:
@@ -397,7 +397,7 @@ def build_wp_offsets(
 def build_replicate_jitter(
     data: pd.DataFrame,
     *,
-    width: float = 0.055,
+    width: float = 0.0,
 ) -> dict[tuple[str, int], float]:
     """Give country-horizon replicates a tiny deterministic x jitter."""
     replicates = sorted(
@@ -464,7 +464,8 @@ def plot_metric(
             ax.scatter(
                 xs,
                 ys,
-                s=28,
+                s=20,
+                # marker="s",
                 color=wp_colours[wp],
                 alpha=0.78 if np.isclose(wp, 0.0) else 0.62,
                 linewidths=0,
@@ -510,13 +511,13 @@ def plot_metric(
     ax.grid(axis="y", linewidth=0.6, alpha=0.25, zorder=0)
 
     if value_column == "ldes_capacity_error_pct":
-        ax.axhline(
-            0.0,
-            color="0.25",
-            linewidth=0.9,
-            linestyle="--",
-            zorder=1,
-        )
+        # ax.axhline(
+        #     0.0,
+        #     color="0.25",
+        #     linewidth=0.9,
+        #     linestyle="--",
+        #     zorder=1,
+        # )
         ax.axhline(
             10.0,
             color="0.30",
@@ -529,6 +530,15 @@ def plot_metric(
             color="0.30",
             linewidth=0.8,
             linestyle=":",
+            zorder=1,
+        )
+
+    if value_column == "ldes_capacity_error_improvement_pct":
+        ax.axhline(
+            0.0,
+            color="0.25",
+            linewidth=0.9,
+            linestyle="--",
             zorder=1,
         )
 
