@@ -1,37 +1,45 @@
-"""Search three-predictor diagnostics for signed LDES capacity bias.
+"""Develop, validate, and refit the final 3-predictor LDES diagnostic.
 
-This is a MODEL-DEVELOPMENT / EXPLORATORY search.
+Workflow
+--------
+1. DEVELOPMENT:
+   Use NL cases only.
+   - Screen individual reference-CEM-free predictors.
+   - Evaluate 3-predictor linear models.
+   - Use leave-one-weather-window-out cross-validation.
+   - Select the model with the highest predictive CV R² subject to VIF <= 5.
 
-Key principles
---------------
-1. Predictor candidates must not use reference-CEM outcomes.
-2. Signed LDES capacity error is used as the training target.
-3. Cross-validation is blocked by weather/horizon window.
-4. High-VIF models are RETAINED rather than discarded.
-5. Strong high-VIF models are inspected for interpretable
-   same-metric / different-window reparameterisations:
-       global
-       local - global
-6. Final generalisation performance must be assessed separately after
-   model structure has been selected.
+2. VALIDATION:
+   Fit the selected specification to ALL NL cases.
+   Apply those coefficients unchanged to ALL BE cases.
+   Report predictive R², RMSE, MAE, and mean error.
 
-Inputs
-------
-results/10_year/signal_metrics.parquet
-results/10_year/investment_metrics.parquet
-results/10_year/parameters.parquet
+3. FINAL REFIT:
+   Keep the predictor specification fixed.
+   Refit only the coefficients using the combined NL + BE dataset.
+   These are the coefficients of the final published diagnostic.
+
+Reference-CEM outcomes are NEVER used as predictors.
+They are used only to define the true signed LDES capacity-error target
+during development and validation.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from itertools import combinations
+import json
 from pathlib import Path
 import time
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.metrics import r2_score
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
 from sklearn.model_selection import LeaveOneGroupOut
 
 
@@ -39,40 +47,23 @@ from sklearn.model_selection import LeaveOneGroupOut
 # USER CONFIGURATION
 # =====================================================================
 
-# ---------------------------------------------------------------------
-# Population
-# ---------------------------------------------------------------------
-
-# "positive" -> lambda_soc > 0
-# "all"      -> all values
-# float      -> one specific value, e.g. 0.5
-PROXY_WEIGHT = "positive"
+DEVELOPMENT_COUNTRY = "NL"
+VALIDATION_COUNTRY = "BE"
 
 PROXY_WEIGHT_FIELD = "lambda_soc"
 
-# Both countries are used for model development here.
-DEVELOPMENT_COUNTRIES = [
-    "NL",
-    "BE",
-]
+# "positive" -> lambda_soc > 0
+# "all"      -> all lambda_soc values
+# float      -> specific value, e.g. 0.5
+PROXY_WEIGHT = "positive"
 
-# Diagnostic target.
 CAPACITY_ERROR = "signed"
 
 
 # ---------------------------------------------------------------------
-# Cross-validation
+# Weather-window blocking used ONLY within NL development
 # ---------------------------------------------------------------------
 
-# Hold out the same weather/horizon window in both countries together.
-#
-# This gives five blocked temporal folds if there are five 10-year
-# windows in the current experiment.
-#
-# Important:
-# Because the underlying 10-year windows overlap in calendar years,
-# this is NOT fully independent external validation. It is a blocked
-# model-selection / stability assessment.
 CV_GROUP_FIELDS = [
     "start_date",
     "end_date",
@@ -80,11 +71,9 @@ CV_GROUP_FIELDS = [
 
 
 # ---------------------------------------------------------------------
-# Allowed predictor space
+# Reference-CEM-free diagnostic predictors
 # ---------------------------------------------------------------------
 
-# These are intentionally restricted to quantities available without
-# reference-CEM outcomes.
 ALLOWED_ERROR_FAMILIES = [
     "clustered_approximation",
     "tsa",
@@ -102,8 +91,7 @@ ALLOWED_METRICS = [
     "pearson",
 ]
 
-# Use the same deployment-available normalisation basis across all
-# normalised predictor families.
+# Common deployment-available normalisation basis.
 NORMALISATION_BASIS = "reference_proxy_full_range"
 
 
@@ -111,57 +99,34 @@ NORMALISATION_BASIS = "reference_proxy_full_range"
 # Candidate reduction
 # ---------------------------------------------------------------------
 
-# Retain strong predictors overall...
 TOP_N_OVERALL = 40
 
-# ...but also preserve several windows within every conceptual metric
-# series so that useful combinations / contrasts are not eliminated
-# simply because a predictor is weak in isolation.
+# Keep several windows from every conceptual metric series so that
+# potentially complementary predictors are not screened out simply
+# because they are weak individually.
 TOP_N_PER_SERIES = 3
 
-# Always retain full-horizon variants.
 KEEP_FULL_HORIZON = True
 
-# Require predictors in a candidate model to be available for at least
-# this fraction of development cases.
 MIN_CASE_FRACTION = 0.95
 
 
 # ---------------------------------------------------------------------
-# VIF
+# Multicollinearity
 # ---------------------------------------------------------------------
 
-# This is NOT a raw-search exclusion threshold.
-# It is used only to flag models.
-VIF_THRESHOLD = 5.0
+MAX_VIF = 5.0
 
 
 # ---------------------------------------------------------------------
-# Contrast / reparameterisation search
-# ---------------------------------------------------------------------
-
-# Only investigate high-VIF models that are reasonably competitive
-# with the best low-VIF raw model.
-#
-# Example:
-# if best acceptable model CV R² = 0.80,
-# inspect high-VIF models down to 0.70.
-CONTRAST_MAX_CV_R2_GAP = 0.10
-
-# Safety cap if there are very many competitive high-VIF models.
-CONTRAST_SOURCE_TOP_N = 2000
-
-
-# ---------------------------------------------------------------------
-# Progress reporting
+# Progress
 # ---------------------------------------------------------------------
 
 PROGRESS_EVERY = 5000
-CONTRAST_PROGRESS_EVERY = 500
 
 
 # ---------------------------------------------------------------------
-# Saved summaries
+# Saved search results
 # ---------------------------------------------------------------------
 
 TOP_MODELS_TO_SAVE = 200
@@ -173,61 +138,39 @@ TOP_MODELS_TO_SAVE = 200
 
 RESULTS_DIR = Path("results") / "10_year"
 
-SIGNAL_METRICS_PATH = (
-    RESULTS_DIR
-    / "signal_metrics.parquet"
-)
+SIGNAL_METRICS_PATH = RESULTS_DIR / "signal_metrics.parquet"
 
-INVESTMENT_METRICS_PATH = (
-    RESULTS_DIR
-    / "investment_metrics.parquet"
-)
+INVESTMENT_METRICS_PATH = RESULTS_DIR / "investment_metrics.parquet"
 
-PARAMETERS_PATH = (
-    RESULTS_DIR
-    / "parameters.parquet"
-)
+PARAMETERS_PATH = RESULTS_DIR / "parameters.parquet"
 
 
-SINGLE_RESULTS_PATH = (
-    RESULTS_DIR
-    / "diagnostic_search_single_predictors.csv"
+SINGLE_RESULTS_PATH = RESULTS_DIR / "diagnostic_nl_single_predictors.csv"
+
+SEARCH_ALL_PATH = RESULTS_DIR / "diagnostic_nl_three_predictor_all.parquet"
+
+SEARCH_TOP_PATH = RESULTS_DIR / "diagnostic_nl_three_predictor_top.csv"
+
+SELECTED_MODEL_PATH = RESULTS_DIR / "diagnostic_selected_model.json"
+
+VALIDATION_PREDICTIONS_PATH = (
+    RESULTS_DIR / "diagnostic_nl_to_be_validation_predictions.csv"
 )
 
-RAW_ALL_PATH = (
-    RESULTS_DIR
-    / "diagnostic_search_three_predictor_raw_all.parquet"
-)
+VALIDATION_SUMMARY_PATH = RESULTS_DIR / "diagnostic_nl_to_be_validation_summary.csv"
 
-RAW_TOP_LOW_VIF_PATH = (
-    RESULTS_DIR
-    / "diagnostic_search_three_predictor_raw_low_vif_top.csv"
-)
+VALIDATION_FIGURE_PATH = RESULTS_DIR / "diagnostic_nl_to_be_validation.png"
 
-RAW_TOP_HIGH_VIF_PATH = (
-    RESULTS_DIR
-    / "diagnostic_search_three_predictor_raw_high_vif_top.csv"
-)
-
-CONTRAST_ALL_PATH = (
-    RESULTS_DIR
-    / "diagnostic_search_contrast_models_all.parquet"
-)
-
-CONTRAST_TOP_PATH = (
-    RESULTS_DIR
-    / "diagnostic_search_contrast_models_top.csv"
-)
+FINAL_COEFFICIENTS_PATH = RESULTS_DIR / "diagnostic_final_pooled_coefficients.csv"
 
 
 # =====================================================================
 # General helpers
 # =====================================================================
 
-def window_label(
-    value: object,
-) -> str:
-    """Stable human/machine-readable temporal-window label."""
+
+def window_label(value: object) -> str:
+    """Readable label for one temporal window."""
 
     if pd.isna(value):
         return "full"
@@ -235,30 +178,13 @@ def window_label(
     return f"{int(value)}d"
 
 
-def window_scope(
-    value: object,
-) -> float:
-    """Numeric scope for ordering local vs global windows."""
-
-    if pd.isna(value):
-        return np.inf
-
-    return float(value)
-
-
-def make_feature_name(
-    row: pd.Series,
-) -> str:
-    """Create a unique predictor name."""
+def make_feature_name(row: pd.Series) -> str:
+    """Unique machine-readable predictor identifier."""
 
     basis = (
         "none"
-        if pd.isna(
-            row["normalisation_basis"]
-        )
-        else str(
-            row["normalisation_basis"]
-        )
+        if pd.isna(row["normalisation_basis"])
+        else str(row["normalisation_basis"])
     )
 
     return (
@@ -270,17 +196,12 @@ def make_feature_name(
     )
 
 
-def format_duration(
-    seconds: float,
-) -> str:
-    """Pretty duration for progress messages."""
+def format_duration(seconds: float) -> str:
 
     if not np.isfinite(seconds):
         return "unknown"
 
-    seconds = int(
-        round(seconds)
-    )
+    seconds = int(round(seconds))
 
     hours, remainder = divmod(
         seconds,
@@ -293,17 +214,10 @@ def format_duration(
     )
 
     if hours:
-        return (
-            f"{hours:d}h "
-            f"{minutes:02d}m "
-            f"{secs:02d}s"
-        )
+        return f"{hours:d}h {minutes:02d}m {secs:02d}s"
 
     if minutes:
-        return (
-            f"{minutes:d}m "
-            f"{secs:02d}s"
-        )
+        return f"{minutes:d}m {secs:02d}s"
 
     return f"{secs:d}s"
 
@@ -315,61 +229,27 @@ def report_progress(
     start_time: float,
     label: str,
 ) -> None:
-    """Print progress, speed, elapsed time and estimated completion."""
 
-    elapsed = (
-        time.perf_counter()
-        - start_time
-    )
+    elapsed = time.perf_counter() - start_time
 
-    if (
-        done <= 0
-        or elapsed <= 0
-    ):
+    if done <= 0 or elapsed <= 0:
         return
 
-    rate = (
-        done
-        / elapsed
-    )
+    rate = done / elapsed
 
-    remaining_items = (
-        total
-        - done
-    )
+    remaining = total - done
 
-    eta_seconds = (
-        remaining_items
-        / rate
-        if rate > 0
-        else np.inf
-    )
+    eta_seconds = remaining / rate if rate > 0 else np.inf
 
-    finish_time = (
-        datetime.now()
-        + timedelta(
-            seconds=eta_seconds
-        )
-        if np.isfinite(
-            eta_seconds
-        )
-        else None
-    )
+    if np.isfinite(eta_seconds):
+        finish_time = datetime.now() + timedelta(seconds=eta_seconds)
 
-    percentage = (
-        100
-        * done
-        / total
-    )
+        finish_string = finish_time.strftime("%H:%M:%S")
 
-    finish_string = (
-        finish_time.strftime(
-            "%H:%M:%S"
-        )
-        if finish_time
-        is not None
-        else "unknown"
-    )
+    else:
+        finish_string = "unknown"
+
+    percentage = 100 * done / total
 
     print(
         f"  {label}: "
@@ -383,44 +263,43 @@ def report_progress(
 
 
 # =====================================================================
-# OLS helpers
+# Linear regression
 # =====================================================================
 
-def fit_ols_predict(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_test: np.ndarray,
-) -> np.ndarray:
-    """OLS with an intercept."""
 
-    X_train_design = np.column_stack(
+def fit_ols(
+    X: np.ndarray,
+    y: np.ndarray,
+) -> np.ndarray:
+    """Fit OLS with intercept and return coefficients."""
+
+    X_design = np.column_stack(
         [
-            np.ones(
-                len(X_train)
-            ),
-            X_train,
+            np.ones(len(X)),
+            X,
         ]
     )
 
-    beta = np.linalg.lstsq(
-        X_train_design,
-        y_train,
+    return np.linalg.lstsq(
+        X_design,
+        y,
         rcond=None,
     )[0]
 
-    X_test_design = np.column_stack(
+
+def predict_ols(
+    X: np.ndarray,
+    beta: np.ndarray,
+) -> np.ndarray:
+
+    X_design = np.column_stack(
         [
-            np.ones(
-                len(X_test)
-            ),
-            X_test,
+            np.ones(len(X)),
+            X,
         ]
     )
 
-    return (
-        X_test_design
-        @ beta
-    )
+    return X_design @ beta
 
 
 def fit_ols_full(
@@ -432,27 +311,18 @@ def fit_ols_full(
     float,
     float,
 ]:
-    """Fit OLS on all supplied rows."""
 
     n = len(y)
     p = X.shape[1]
 
-    X_design = np.column_stack(
-        [
-            np.ones(n),
-            X,
-        ]
+    beta = fit_ols(
+        X,
+        y,
     )
 
-    beta = np.linalg.lstsq(
-        X_design,
-        y,
-        rcond=None,
-    )[0]
-
-    y_hat = (
-        X_design
-        @ beta
+    y_hat = predict_ols(
+        X,
+        beta,
     )
 
     r2 = r2_score(
@@ -462,20 +332,9 @@ def fit_ols_full(
 
     if n <= p + 1:
         adjusted_r2 = np.nan
+
     else:
-        adjusted_r2 = (
-            1
-            - (
-                1
-                - r2
-            )
-            * (
-                n - 1
-            )
-            / (
-                n - p - 1
-            )
-        )
+        adjusted_r2 = 1 - (1 - r2) * (n - 1) / (n - p - 1)
 
     return (
         beta,
@@ -489,26 +348,18 @@ def fit_ols_full(
 # Metadata
 # =====================================================================
 
+
 def parameters_to_wide(
     parameters: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Return one row per case."""
+    """Ensure one metadata row per case."""
 
-    if (
-        "case_id"
-        not in parameters.columns
-    ):
-        raise ValueError(
-            "parameters.parquet must contain case_id."
-        )
+    if "case_id" not in parameters.columns:
+        raise ValueError("parameters.parquet must contain case_id.")
 
-    # Current results schema is already wide.
-    if not parameters[
-        "case_id"
-    ].duplicated().any():
+    if not parameters["case_id"].duplicated().any():
         return parameters.copy()
 
-    # Fallback for long-format parameter tables.
     name_candidates = [
         "parameter",
         "parameter_name",
@@ -517,21 +368,11 @@ def parameters_to_wide(
     ]
 
     name_column = next(
-        (
-            column
-            for column
-            in name_candidates
-            if column
-            in parameters.columns
-        ),
+        (column for column in name_candidates if column in parameters.columns),
         None,
     )
 
-    if (
-        name_column is None
-        or "value"
-        not in parameters.columns
-    ):
+    if name_column is None or "value" not in parameters.columns:
         raise ValueError(
             "Could not convert parameters.parquet "
             "to one row per case.\n"
@@ -562,8 +403,9 @@ def parameters_to_wide(
 
 
 # =====================================================================
-# Predictor preparation
+# Predictor construction
 # =====================================================================
+
 
 def prepare_signal_metrics(
     signal_metrics: pd.DataFrame,
@@ -571,34 +413,16 @@ def prepare_signal_metrics(
     pd.DataFrame,
     pd.DataFrame,
 ]:
-    """Build strictly reference-CEM-free predictor matrix."""
+    """Construct the permitted diagnostic predictor matrix."""
 
-    diagnostics = (
-        signal_metrics.loc[
-            signal_metrics[
-                "error_family"
-            ].isin(
-                ALLOWED_ERROR_FAMILIES
-            )
-            &
-            signal_metrics[
-                "signal_type"
-            ].isin(
-                ALLOWED_SIGNAL_TYPES
-            )
-            &
-            signal_metrics[
-                "metric"
-            ].isin(
-                ALLOWED_METRICS
-            )
-        ]
-        .copy()
-    )
-
+    diagnostics = signal_metrics.loc[
+        signal_metrics["error_family"].isin(ALLOWED_ERROR_FAMILIES)
+        & signal_metrics["signal_type"].isin(ALLOWED_SIGNAL_TYPES)
+        & signal_metrics["metric"].isin(ALLOWED_METRICS)
+    ].copy()
 
     # =============================================================
-    # Reference-CEM leakage guard
+    # HARD reference-CEM leakage check
     # =============================================================
 
     forbidden_families = {
@@ -606,98 +430,43 @@ def prepare_signal_metrics(
         "cem",
     }
 
-    if diagnostics[
-        "error_family"
-    ].isin(
-        forbidden_families
-    ).any():
-
+    if diagnostics["error_family"].isin(forbidden_families).any():
         raise RuntimeError(
-            "Reference-CEM-dependent metric entered "
-            "the diagnostic predictor pool."
+            "Reference-CEM-dependent predictors entered the diagnostic feature pool."
         )
-
 
     # =============================================================
     # Normalisation
     # =============================================================
 
-    normalised_mask = (
-        diagnostics[
-            "metric"
-        ].isin(
-            [
-                "nmbe",
-                "nrmse",
-            ]
-        )
-        &
-        (
-            diagnostics[
-                "normalisation_basis"
-            ]
-            == NORMALISATION_BASIS
-        )
-    )
-
-    pearson_mask = (
-        (
-            diagnostics[
-                "metric"
-            ]
-            == "pearson"
-        )
-        &
-        diagnostics[
-            "normalisation_basis"
-        ].isna()
-    )
-
-    diagnostics = (
-        diagnostics.loc[
-            normalised_mask
-            | pearson_mask
+    normalised_mask = diagnostics["metric"].isin(
+        [
+            "nmbe",
+            "nrmse",
         ]
-        .copy()
-    )
+    ) & (diagnostics["normalisation_basis"] == NORMALISATION_BASIS)
 
+    pearson_mask = (diagnostics["metric"] == "pearson") & diagnostics[
+        "normalisation_basis"
+    ].isna()
 
-    diagnostics[
-        "feature"
-    ] = diagnostics.apply(
+    diagnostics = diagnostics.loc[normalised_mask | pearson_mask].copy()
+
+    diagnostics["feature"] = diagnostics.apply(
         make_feature_name,
         axis=1,
     )
 
-
-    duplicates = (
-        diagnostics.duplicated(
-            subset=[
-                "case_id",
-                "feature",
-            ],
-            keep=False,
-        )
+    duplicates = diagnostics.duplicated(
+        subset=[
+            "case_id",
+            "feature",
+        ],
+        keep=False,
     )
 
     if duplicates.any():
-
-        example = (
-            diagnostics.loc[
-                duplicates,
-                [
-                    "case_id",
-                    "feature",
-                ],
-            ]
-            .head(20)
-        )
-
-        raise ValueError(
-            "Duplicate case/feature pairs found:\n"
-            f"{example.to_string(index=False)}"
-        )
-
+        raise ValueError("Duplicate case_id / feature pairs detected.")
 
     catalogue = (
         diagnostics[
@@ -711,11 +480,8 @@ def prepare_signal_metrics(
             ]
         ]
         .drop_duplicates()
-        .reset_index(
-            drop=True
-        )
+        .reset_index(drop=True)
     )
-
 
     X = diagnostics.pivot(
         index="case_id",
@@ -732,8 +498,76 @@ def prepare_signal_metrics(
 
 
 # =====================================================================
-# Cross-validation
+# VIF
 # =====================================================================
+
+
+def calculate_vif(
+    X: np.ndarray,
+) -> np.ndarray:
+
+    finite = np.all(
+        np.isfinite(X),
+        axis=1,
+    )
+
+    X = X[finite]
+
+    p = X.shape[1]
+
+    if len(X) <= p or p < 2:
+        return np.full(
+            p,
+            np.nan,
+        )
+
+    std = np.std(
+        X,
+        axis=0,
+        ddof=1,
+    )
+
+    if np.any(std == 0):
+        return np.full(
+            p,
+            np.inf,
+        )
+
+    Z = (
+        X
+        - np.mean(
+            X,
+            axis=0,
+        )
+    ) / std
+
+    corr = np.corrcoef(
+        Z,
+        rowvar=False,
+    )
+
+    if not np.all(np.isfinite(corr)):
+        return np.full(
+            p,
+            np.inf,
+        )
+
+    try:
+        inv_corr = np.linalg.inv(corr)
+
+    except np.linalg.LinAlgError:
+        return np.full(
+            p,
+            np.inf,
+        )
+
+    return np.diag(inv_corr)
+
+
+# =====================================================================
+# NL blocked cross-validation
+# =====================================================================
+
 
 def make_group_splits(
     groups: np.ndarray,
@@ -743,27 +577,10 @@ def make_group_splits(
         np.ndarray,
     ]
 ]:
-    """Leave one weather/horizon group out."""
 
-    unique_groups = np.unique(
-        groups
-    )
+    splitter = LeaveOneGroupOut()
 
-    if (
-        len(unique_groups)
-        < 3
-    ):
-        raise ValueError(
-            "Need at least three independent CV groups."
-        )
-
-    splitter = (
-        LeaveOneGroupOut()
-    )
-
-    dummy = np.zeros(
-        len(groups)
-    )
+    dummy = np.zeros(len(groups))
 
     return list(
         splitter.split(
@@ -783,7 +600,7 @@ def cross_validated_r2(
         ]
     ],
 ) -> dict[str, float]:
-    """Blocked out-of-fold R²."""
+    """Generate truly out-of-fold predictions within NL."""
 
     predictions = np.full(
         len(y),
@@ -793,507 +610,174 @@ def cross_validated_r2(
 
     fold_r2 = []
 
-
     for (
         train_idx,
         test_idx,
     ) in splits:
+        X_train = X[train_idx]
 
-        X_train = X[
-            train_idx
-        ]
+        y_train = y[train_idx]
 
-        y_train = y[
-            train_idx
-        ]
+        X_test = X[test_idx]
 
-        X_test = X[
-            test_idx
-        ]
+        y_test = y[test_idx]
 
-        y_test = y[
-            test_idx
-        ]
-
-
-        train_valid = (
-            np.isfinite(
-                y_train
-            )
-            &
-            np.all(
-                np.isfinite(
-                    X_train
-                ),
-                axis=1,
-            )
+        train_valid = np.isfinite(y_train) & np.all(
+            np.isfinite(X_train),
+            axis=1,
         )
 
-        test_valid = (
-            np.isfinite(
-                y_test
-            )
-            &
-            np.all(
-                np.isfinite(
-                    X_test
-                ),
-                axis=1,
-            )
+        test_valid = np.isfinite(y_test) & np.all(
+            np.isfinite(X_test),
+            axis=1,
         )
 
-
-        if (
-            train_valid.sum()
-            <= X.shape[1] + 1
-        ):
+        if train_valid.sum() <= X.shape[1] + 1:
             continue
 
-        if (
-            test_valid.sum()
-            < 2
-        ):
+        if test_valid.sum() < 2:
             continue
 
-
-        pred = fit_ols_predict(
-            X_train[
-                train_valid
-            ],
-            y_train[
-                train_valid
-            ],
-            X_test[
-                test_valid
-            ],
+        beta = fit_ols(
+            X_train[train_valid],
+            y_train[train_valid],
         )
 
-
-        test_rows = (
-            test_idx[
-                test_valid
-            ]
+        pred = predict_ols(
+            X_test[test_valid],
+            beta,
         )
 
-        predictions[
-            test_rows
-        ] = pred
+        prediction_rows = test_idx[test_valid]
 
+        predictions[prediction_rows] = pred
 
-        y_test_valid = (
-            y_test[
-                test_valid
-            ]
-        )
-
-        if (
-            np.std(
-                y_test_valid
-            )
-            > 0
-        ):
+        if np.std(y_test[test_valid]) > 0:
             fold_r2.append(
                 r2_score(
-                    y_test_valid,
+                    y_test[test_valid],
                     pred,
                 )
             )
 
+    valid = np.isfinite(y) & np.isfinite(predictions)
 
-    valid_oof = (
-        np.isfinite(y)
-        &
-        np.isfinite(
-            predictions
-        )
-    )
+    if valid.sum() < 3:
+        pooled_r2 = np.nan
 
-
-    if (
-        valid_oof.sum()
-        < 3
-    ):
-        oof_r2 = np.nan
     else:
-        oof_r2 = r2_score(
-            y[
-                valid_oof
-            ],
-            predictions[
-                valid_oof
-            ],
+        pooled_r2 = r2_score(
+            y[valid],
+            predictions[valid],
         )
-
 
     return {
-        "cv_r2_oof":
-            float(oof_r2),
-        "cv_r2_fold_mean":
-            (
-                float(
-                    np.mean(
-                        fold_r2
-                    )
-                )
-                if fold_r2
-                else np.nan
-            ),
-        "cv_r2_fold_std":
-            (
-                float(
-                    np.std(
-                        fold_r2
-                    )
-                )
-                if fold_r2
-                else np.nan
-            ),
-        "cv_n_predicted":
-            int(
-                valid_oof.sum()
-            ),
+        "cv_r2_oof": float(pooled_r2),
+        "cv_r2_fold_mean": (float(np.mean(fold_r2)) if fold_r2 else np.nan),
+        "cv_r2_fold_std": (float(np.std(fold_r2)) if fold_r2 else np.nan),
+        "cv_n_predicted": int(valid.sum()),
     }
 
 
 # =====================================================================
-# VIF
+# Prediction metrics
 # =====================================================================
 
-def calculate_vif(
-    X: np.ndarray,
-) -> np.ndarray:
-    """Calculate VIF for all supplied predictors."""
 
-    finite = np.all(
-        np.isfinite(X),
-        axis=1,
-    )
+def prediction_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+) -> dict[str, float]:
 
-    X = X[
-        finite
-    ]
+    valid = np.isfinite(y_true) & np.isfinite(y_pred)
 
-    p = X.shape[1]
+    y_true = y_true[valid]
 
-    if (
-        len(X) <= p
-        or p < 2
-    ):
-        return np.full(
-            p,
-            np.nan,
-        )
+    y_pred = y_pred[valid]
 
+    residual = y_pred - y_true
 
-    std = np.std(
-        X,
-        axis=0,
-        ddof=1,
-    )
-
-    if np.any(
-        std == 0
-    ):
-        return np.full(
-            p,
-            np.inf,
-        )
-
-
-    Z = (
-        X
-        - np.mean(
-            X,
-            axis=0,
-        )
-    ) / std
-
-
-    corr = np.corrcoef(
-        Z,
-        rowvar=False,
-    )
-
-
-    if not np.all(
-        np.isfinite(
-            corr
-        )
-    ):
-        return np.full(
-            p,
-            np.inf,
-        )
-
-
-    try:
-        inv_corr = (
-            np.linalg.inv(
-                corr
+    return {
+        "n": int(len(y_true)),
+        "r2": float(
+            r2_score(
+                y_true,
+                y_pred,
             )
-        )
-
-    except np.linalg.LinAlgError:
-
-        return np.full(
-            p,
-            np.inf,
-        )
-
-
-    return np.diag(
-        inv_corr
-    )
-
-
-# =====================================================================
-# Feature metadata / contrast helpers
-# =====================================================================
-
-def feature_signature(
-    row: pd.Series,
-) -> tuple:
-    """Conceptual metric identity, excluding temporal window."""
-
-    basis = (
-        None
-        if pd.isna(
-            row[
-                "normalisation_basis"
-            ]
-        )
-        else row[
-            "normalisation_basis"
-        ]
-    )
-
-    return (
-        row[
-            "error_family"
-        ],
-        row[
-            "signal_type"
-        ],
-        row[
-            "metric"
-        ],
-        basis,
-    )
-
-
-def identify_window_pair(
-    feature_a: str,
-    feature_b: str,
-    catalogue_lookup: pd.DataFrame,
-) -> (
-    tuple[
-        str,
-        str,
-    ]
-    | None
-):
-    """Return (local_feature, global_feature) if same metric/different window."""
-
-    row_a = (
-        catalogue_lookup.loc[
-            feature_a
-        ]
-    )
-
-    row_b = (
-        catalogue_lookup.loc[
-            feature_b
-        ]
-    )
-
-
-    if (
-        feature_signature(
-            row_a
-        )
-        !=
-        feature_signature(
-            row_b
-        )
-    ):
-        return None
-
-
-    window_a = (
-        row_a[
-            "window_half_width_days"
-        ]
-    )
-
-    window_b = (
-        row_b[
-            "window_half_width_days"
-        ]
-    )
-
-
-    # Same window -> no meaningful contrast.
-    if (
-        pd.isna(
-            window_a
-        )
-        and pd.isna(
-            window_b
-        )
-    ):
-        return None
-
-    if (
-        not pd.isna(
-            window_a
-        )
-        and not pd.isna(
-            window_b
-        )
-        and float(
-            window_a
-        )
-        == float(
-            window_b
-        )
-    ):
-        return None
-
-
-    scope_a = window_scope(
-        window_a
-    )
-
-    scope_b = window_scope(
-        window_b
-    )
-
-
-    if (
-        scope_a
-        < scope_b
-    ):
-        return (
-            feature_a,
-            feature_b,
-        )
-
-    return (
-        feature_b,
-        feature_a,
-    )
+        ),
+        "rmse": float(
+            np.sqrt(
+                mean_squared_error(
+                    y_true,
+                    y_pred,
+                )
+            )
+        ),
+        "mae": float(
+            mean_absolute_error(
+                y_true,
+                y_pred,
+            )
+        ),
+        # Positive = diagnostic over-predicts capacity error on average.
+        "mean_prediction_error": float(np.mean(residual)),
+    }
 
 
 # =====================================================================
-# Load
+# Load data
 # =====================================================================
 
-print(
-    f"Reading "
-    f"{SIGNAL_METRICS_PATH}"
-)
+print(f"Reading {SIGNAL_METRICS_PATH}")
 
-signal_metrics = (
-    pd.read_parquet(
-        SIGNAL_METRICS_PATH
-    )
-)
+signal_metrics = pd.read_parquet(SIGNAL_METRICS_PATH)
 
 
-print(
-    f"Reading "
-    f"{INVESTMENT_METRICS_PATH}"
-)
+print(f"Reading {INVESTMENT_METRICS_PATH}")
 
-investment_metrics = (
-    pd.read_parquet(
-        INVESTMENT_METRICS_PATH
-    )
-)
+investment_metrics = pd.read_parquet(INVESTMENT_METRICS_PATH)
 
 
-print(
-    f"Reading "
-    f"{PARAMETERS_PATH}"
-)
+print(f"Reading {PARAMETERS_PATH}")
 
-parameters = (
-    pd.read_parquet(
-        PARAMETERS_PATH
-    )
-)
+parameters = pd.read_parquet(PARAMETERS_PATH)
 
 
-metadata = parameters_to_wide(
-    parameters
-)
+metadata = parameters_to_wide(parameters)
 
 
 # =====================================================================
-# Validate metadata
+# Metadata validation
 # =====================================================================
 
-required_metadata = (
-    [
-        "case_id",
-        PROXY_WEIGHT_FIELD,
-        "country",
-    ]
-    + CV_GROUP_FIELDS
-)
-
-
-missing_metadata = [
-    column
-    for column
-    in required_metadata
-    if column
-    not in metadata.columns
+required_columns = [
+    "case_id",
+    "country",
+    PROXY_WEIGHT_FIELD,
+    *CV_GROUP_FIELDS,
 ]
 
 
-if missing_metadata:
-
-    raise ValueError(
-        "Missing required metadata columns: "
-        f"{missing_metadata}"
-    )
+missing = [column for column in required_columns if column not in metadata.columns]
 
 
-metadata[
-    "proxy_weight"
-] = pd.to_numeric(
-    metadata[
-        PROXY_WEIGHT_FIELD
-    ],
+if missing:
+    raise ValueError(f"Missing metadata columns: {missing}")
+
+
+metadata["proxy_weight"] = pd.to_numeric(
+    metadata[PROXY_WEIGHT_FIELD],
     errors="coerce",
 )
 
 
-metadata[
-    "cv_group"
-] = (
-    metadata[
-        CV_GROUP_FIELDS
-    ]
+metadata["cv_group"] = (
+    metadata[CV_GROUP_FIELDS]
     .astype(str)
     .agg(
         " | ".join,
         axis=1,
     )
-)
-
-
-print(
-    "\nCV grouping fields:",
-    CV_GROUP_FIELDS,
-)
-
-print(
-    "Total weather/horizon groups:",
-    metadata[
-        "cv_group"
-    ].nunique(),
 )
 
 
@@ -1303,10 +787,7 @@ print(
 
 target = (
     investment_metrics.loc[
-        investment_metrics[
-            "metric"
-        ]
-        == "ldes_capacity_error_signed",
+        investment_metrics["metric"] == "ldes_capacity_error_signed",
         [
             "case_id",
             "value",
@@ -1314,83 +795,40 @@ target = (
     ]
     .rename(
         columns={
-            "value":
-            "ldes_capacity_error_signed",
+            "value": "ldes_capacity_error_signed",
         }
     )
     .copy()
 )
 
 
-if target[
-    "case_id"
-].duplicated().any():
-
-    raise ValueError(
-        "Expected one signed LDES capacity error per case."
-    )
+if target["case_id"].duplicated().any():
+    raise ValueError("Expected one LDES capacity-error value per case.")
 
 
-if (
-    CAPACITY_ERROR
-    == "signed"
-):
+if CAPACITY_ERROR == "signed":
+    target["target"] = target["ldes_capacity_error_signed"]
 
-    target[
-        "target"
-    ] = (
-        target[
-            "ldes_capacity_error_signed"
-        ]
-    )
-
-elif (
-    CAPACITY_ERROR
-    == "absolute"
-):
-
-    target[
-        "target"
-    ] = (
-        target[
-            "ldes_capacity_error_signed"
-        ].abs()
-    )
+elif CAPACITY_ERROR == "absolute":
+    target["target"] = target["ldes_capacity_error_signed"].abs()
 
 else:
-
-    raise ValueError(
-        "CAPACITY_ERROR must be "
-        "'signed' or 'absolute'."
-    )
+    raise ValueError("CAPACITY_ERROR must be 'signed' or 'absolute'.")
 
 
 # =====================================================================
-# Predictors
+# Predictor matrix
 # =====================================================================
 
-X_wide, catalogue = (
-    prepare_signal_metrics(
-        signal_metrics
-    )
-)
-
-
-catalogue_lookup = (
-    catalogue
-    .set_index(
-        "feature"
-    )
-)
+X_wide, catalogue = prepare_signal_metrics(signal_metrics)
 
 
 # =====================================================================
-# Analysis table
+# Master analysis table
 # =====================================================================
 
 analysis = (
-    target
-    .merge(
+    target.merge(
         metadata[
             [
                 "case_id",
@@ -1403,9 +841,7 @@ analysis = (
         how="inner",
         validate="one_to_one",
     )
-    .set_index(
-        "case_id"
-    )
+    .set_index("case_id")
     .join(
         X_wide,
         how="inner",
@@ -1414,50 +850,13 @@ analysis = (
 
 
 # ---------------------------------------------------------------------
-# Countries
+# W_P filter applied equally to NL and BE
 # ---------------------------------------------------------------------
 
-if (
-    DEVELOPMENT_COUNTRIES
-    is not None
-):
+if PROXY_WEIGHT == "positive":
+    analysis = analysis.loc[analysis["proxy_weight"] > 0].copy()
 
-    analysis = (
-        analysis.loc[
-            analysis[
-                "country"
-            ].isin(
-                DEVELOPMENT_COUNTRIES
-            )
-        ]
-        .copy()
-    )
-
-
-# ---------------------------------------------------------------------
-# W_P
-# ---------------------------------------------------------------------
-
-if (
-    PROXY_WEIGHT
-    == "positive"
-):
-
-    analysis = (
-        analysis.loc[
-            analysis[
-                "proxy_weight"
-            ]
-            > 0
-        ]
-        .copy()
-    )
-
-elif (
-    PROXY_WEIGHT
-    == "all"
-):
-
+elif PROXY_WEIGHT == "all":
     pass
 
 elif isinstance(
@@ -1467,160 +866,101 @@ elif isinstance(
         int,
     ),
 ):
-
-    analysis = (
-        analysis.loc[
-            np.isclose(
-                analysis[
-                    "proxy_weight"
-                ],
-                float(
-                    PROXY_WEIGHT
-                ),
-            )
-        ]
-        .copy()
-    )
+    analysis = analysis.loc[
+        np.isclose(
+            analysis["proxy_weight"],
+            float(PROXY_WEIGHT),
+        )
+    ].copy()
 
 else:
-
-    raise ValueError(
-        "PROXY_WEIGHT must be "
-        "'positive', 'all', or numeric."
-    )
+    raise ValueError("PROXY_WEIGHT must be 'positive', 'all', or numeric.")
 
 
-if analysis.empty:
+development = analysis.loc[analysis["country"] == DEVELOPMENT_COUNTRY].copy()
 
-    raise ValueError(
-        "No cases remain after filtering."
-    )
+
+validation = analysis.loc[analysis["country"] == VALIDATION_COUNTRY].copy()
+
+
+if development.empty:
+    raise ValueError(f"No {DEVELOPMENT_COUNTRY} development cases found.")
+
+
+if validation.empty:
+    raise ValueError(f"No {VALIDATION_COUNTRY} validation cases found.")
 
 
 print(
-    "\nCases retained:",
-    len(
-        analysis
-    ),
+    "\nDevelopment country:",
+    DEVELOPMENT_COUNTRY,
 )
 
 print(
-    "Countries:",
-    sorted(
-        analysis[
-            "country"
-        ].unique()
-    ),
+    "Development cases:",
+    len(development),
 )
 
 print(
-    "Blocked CV groups:",
-    analysis[
-        "cv_group"
-    ].nunique(),
+    "Development weather-window groups:",
+    development["cv_group"].nunique(),
 )
 
 
 print(
-    "\nCases per blocked CV group:\n"
+    "\nValidation country:",
+    VALIDATION_COUNTRY,
 )
 
 print(
-    analysis[
-        "cv_group"
-    ]
-    .value_counts()
-    .sort_index()
-    .to_string()
+    "Validation cases:",
+    len(validation),
 )
+
+
+print("\nDevelopment cases per CV group:\n")
+
+print(development["cv_group"].value_counts().sort_index().to_string())
 
 
 # =====================================================================
-# Common CV splits
+# NL cross-validation setup
 # =====================================================================
 
-y = (
-    analysis[
-        "target"
-    ]
-    .to_numpy(
-        dtype=float
-    )
-)
+y_dev = development["target"].to_numpy(dtype=float)
 
 
-groups = (
-    analysis[
-        "cv_group"
-    ]
-    .astype(str)
-    .to_numpy()
-)
+groups_dev = development["cv_group"].astype(str).to_numpy()
 
 
-splits = make_group_splits(
-    groups
-)
+splits = make_group_splits(groups_dev)
 
 
-print(
-    f"\nUsing "
-    f"{len(splits)} "
-    "leave-one-weather-window-out folds."
-)
+print(f"\nUsing {len(splits)} leave-one-weather-window-out development folds.")
 
 
 # =====================================================================
-# 1. Single-predictor screening
+# 1. Single-predictor screening — NL ONLY
 # =====================================================================
 
-print(
-    "\nScoring individual predictors..."
-)
+print("\nScoring individual predictors on NL only...")
 
 
 single_rows = []
 
 
 for feature in X_wide.columns:
+    x = development[[feature]].to_numpy(dtype=float)
 
-    x = (
-        analysis[
-            [feature]
-        ]
-        .to_numpy(
-            dtype=float
-        )
-    )
+    valid = np.isfinite(y_dev) & np.isfinite(x[:, 0])
 
-
-    valid = (
-        np.isfinite(y)
-        &
-        np.isfinite(
-            x[:, 0]
-        )
-    )
-
-
-    if (
-        valid.sum()
-        >= 3
-    ):
-
-        beta, _, r2, adj_r2 = (
-            fit_ols_full(
-                x[
-                    valid
-                ],
-                y[
-                    valid
-                ],
-            )
+    if valid.sum() >= 3:
+        beta, _, r2, adjusted_r2 = fit_ols_full(
+            x[valid],
+            y_dev[valid],
         )
 
     else:
-
         beta = np.array(
             [
                 np.nan,
@@ -1629,41 +969,29 @@ for feature in X_wide.columns:
         )
 
         r2 = np.nan
-        adj_r2 = np.nan
-
+        adjusted_r2 = np.nan
 
     cv = cross_validated_r2(
         x,
-        y,
+        y_dev,
         splits,
     )
 
-
     single_rows.append(
         {
-            "feature":
-                feature,
-            "n":
-                int(
-                    valid.sum()
-                ),
-            "r2":
-                r2,
-            "adjusted_r2":
-                adj_r2,
-            "intercept":
-                beta[0],
-            "coefficient":
-                beta[1],
+            "feature": feature,
+            "n": int(valid.sum()),
+            "r2": r2,
+            "adjusted_r2": adjusted_r2,
+            "intercept": beta[0],
+            "coefficient": beta[1],
             **cv,
         }
     )
 
 
 single = (
-    pd.DataFrame(
-        single_rows
-    )
+    pd.DataFrame(single_rows)
     .merge(
         catalogue,
         on="feature",
@@ -1674,9 +1002,7 @@ single = (
         "cv_r2_oof",
         ascending=False,
     )
-    .reset_index(
-        drop=True
-    )
+    .reset_index(drop=True)
 )
 
 
@@ -1686,26 +1012,17 @@ single.to_csv(
 )
 
 
-print(
-    "Saved single-predictor results to "
-    f"{SINGLE_RESULTS_PATH}"
-)
+print(f"Saved NL single-predictor results to {SINGLE_RESULTS_PATH}")
 
 
 # =====================================================================
-# 2. Diversity-aware predictor selection
+# 2. Diversity-aware candidate reduction — NL ONLY
 # =====================================================================
 
 selected_features: set[str] = set()
 
 
-selected_features.update(
-    single.head(
-        TOP_N_OVERALL
-    )[
-        "feature"
-    ]
-)
+selected_features.update(single.head(TOP_N_OVERALL)["feature"])
 
 
 series_group = [
@@ -1715,110 +1032,65 @@ series_group = [
 ]
 
 
-for _, subset in (
-    single.groupby(
-        series_group,
-        dropna=False,
-    )
+for _, subset in single.groupby(
+    series_group,
+    dropna=False,
 ):
-
-    subset = (
-        subset.sort_values(
-            "cv_r2_oof",
-            ascending=False,
-        )
+    subset = subset.sort_values(
+        "cv_r2_oof",
+        ascending=False,
     )
 
-    selected_features.update(
-        subset.head(
-            TOP_N_PER_SERIES
-        )[
-            "feature"
-        ]
-    )
+    selected_features.update(subset.head(TOP_N_PER_SERIES)["feature"])
 
 
 if KEEP_FULL_HORIZON:
-
     selected_features.update(
         single.loc[
-            single[
-                "window_half_width_days"
-            ].isna(),
+            single["window_half_width_days"].isna(),
             "feature",
         ]
     )
 
 
-selected_features = sorted(
-    selected_features
-)
+selected_features = sorted(selected_features)
 
 
-n_features = len(
-    selected_features
-)
+n_features = len(selected_features)
 
 
-n_combinations = (
-    n_features
-    * (
-        n_features - 1
-    )
-    * (
-        n_features - 2
-    )
-    // 6
-)
+n_combinations = n_features * (n_features - 1) * (n_features - 2) // 6
 
 
 print(
     "\nPredictors before screening:",
-    len(
-        single
-    ),
+    len(single),
 )
 
 print(
-    "Predictors entering raw 3-way search:",
+    "Predictors entering NL 3-way search:",
     n_features,
 )
 
 print(
-    "Raw 3-predictor combinations:",
+    "Three-predictor combinations:",
     f"{n_combinations:,}",
 )
 
 
-minimum_cases = int(
-    np.ceil(
-        MIN_CASE_FRACTION
-        * len(
-            analysis
-        )
-    )
-)
+minimum_cases = int(np.ceil(MIN_CASE_FRACTION * len(development)))
 
 
 # =====================================================================
-# 3. RAW three-predictor search
+# 3. Three-predictor search — NL ONLY
 # =====================================================================
 
-print(
-    "\nSearching raw 3-predictor models..."
-)
-
-print(
-    "High-VIF models will be retained and flagged, "
-    "not discarded."
-)
+print("\nSearching NL three-predictor models...")
 
 
-raw_rows = []
+search_rows = []
 
-raw_start = (
-    time.perf_counter()
-)
+search_start = time.perf_counter()
 
 
 for i, feature_tuple in enumerate(
@@ -1828,996 +1100,578 @@ for i, feature_tuple in enumerate(
     ),
     start=1,
 ):
+    features = list(feature_tuple)
 
-    features = list(
-        feature_tuple
+    X = development[features].to_numpy(dtype=float)
+
+    valid = np.isfinite(y_dev) & np.all(
+        np.isfinite(X),
+        axis=1,
     )
 
+    n = int(valid.sum())
 
-    X = (
-        analysis[
-            features
-        ]
-        .to_numpy(
-            dtype=float
+    if n >= minimum_cases:
+        vif = calculate_vif(X[valid])
+
+        max_vif = float(np.nanmax(vif))
+
+        passes_vif = bool(np.isfinite(max_vif) and max_vif <= MAX_VIF)
+
+        beta, _, r2, adjusted_r2 = fit_ols_full(
+            X[valid],
+            y_dev[valid],
         )
-    )
-
-
-    valid = (
-        np.isfinite(y)
-        &
-        np.all(
-            np.isfinite(
-                X
-            ),
-            axis=1,
-        )
-    )
-
-
-    n = int(
-        valid.sum()
-    )
-
-
-    if (
-        n
-        >= minimum_cases
-    ):
-
-        # ---------------------------------------------------------
-        # VIF
-        # ---------------------------------------------------------
-
-        vif = calculate_vif(
-            X[
-                valid
-            ]
-        )
-
-
-        max_vif = float(
-            np.nanmax(
-                vif
-            )
-        )
-
-
-        passes_vif = bool(
-            np.isfinite(
-                max_vif
-            )
-            and max_vif
-            <= VIF_THRESHOLD
-        )
-
-
-        # ---------------------------------------------------------
-        # Full-data fit
-        # ---------------------------------------------------------
-
-        beta, _, r2, adj_r2 = (
-            fit_ols_full(
-                X[
-                    valid
-                ],
-                y[
-                    valid
-                ],
-            )
-        )
-
-
-        # ---------------------------------------------------------
-        # Blocked CV
-        # ---------------------------------------------------------
 
         cv = cross_validated_r2(
             X,
-            y,
+            y_dev,
             splits,
         )
 
-
-        raw_rows.append(
+        search_rows.append(
             {
-                "feature_1":
-                    features[0],
-                "feature_2":
-                    features[1],
-                "feature_3":
-                    features[2],
-
-                "n":
-                    n,
-
-                "r2":
-                    r2,
-                "adjusted_r2":
-                    adj_r2,
-
+                "feature_1": features[0],
+                "feature_2": features[1],
+                "feature_3": features[2],
+                "n": n,
+                "r2": r2,
+                "adjusted_r2": adjusted_r2,
                 **cv,
-
-                "intercept":
-                    beta[0],
-
-                "beta_1":
-                    beta[1],
-                "beta_2":
-                    beta[2],
-                "beta_3":
-                    beta[3],
-
-                "vif_1":
-                    vif[0],
-                "vif_2":
-                    vif[1],
-                "vif_3":
-                    vif[2],
-
-                "max_vif":
-                    max_vif,
-
-                "passes_vif":
-                    passes_vif,
+                "intercept": beta[0],
+                "beta_1": beta[1],
+                "beta_2": beta[2],
+                "beta_3": beta[3],
+                "vif_1": vif[0],
+                "vif_2": vif[1],
+                "vif_3": vif[2],
+                "max_vif": max_vif,
+                "passes_vif": passes_vif,
             }
         )
 
-
-    if (
-        i % PROGRESS_EVERY
-        == 0
-        or i
-        == n_combinations
-    ):
-
+    if i % PROGRESS_EVERY == 0 or i == n_combinations:
         report_progress(
             done=i,
             total=n_combinations,
-            start_time=raw_start,
-            label="raw search",
+            start_time=search_start,
+            label="NL search",
         )
 
 
-raw_models = pd.DataFrame(
-    raw_rows
+models = pd.DataFrame(search_rows)
+
+
+if models.empty:
+    raise ValueError("No NL three-predictor models were fitted.")
+
+
+models = models.sort_values(
+    [
+        "cv_r2_oof",
+        "max_vif",
+    ],
+    ascending=[
+        False,
+        True,
+    ],
+).reset_index(drop=True)
+
+
+models.to_parquet(
+    SEARCH_ALL_PATH,
+    index=False,
 )
 
 
-if raw_models.empty:
-
-    raise ValueError(
-        "No raw candidate models were fitted."
-    )
+acceptable_models = models.loc[models["passes_vif"]].copy()
 
 
-raw_models = (
-    raw_models.sort_values(
-        [
-            "cv_r2_oof",
-            "max_vif",
-        ],
-        ascending=[
-            False,
-            True,
-        ],
-    )
-    .reset_index(
-        drop=True
-    )
-)
+if acceptable_models.empty:
+    raise ValueError(f"No model satisfied VIF <= {MAX_VIF}.")
 
 
-raw_models[
-    "raw_rank"
-] = (
-    np.arange(
-        len(
-            raw_models
-        )
-    )
-    + 1
-)
-
-
-raw_models.to_parquet(
-    RAW_ALL_PATH,
+acceptable_models.head(TOP_MODELS_TO_SAVE).to_csv(
+    SEARCH_TOP_PATH,
     index=False,
 )
 
 
 # =====================================================================
-# 4. Separate low- and high-VIF raw models
+# 4. Select the diagnostic specification
 # =====================================================================
 
-low_vif_models = (
-    raw_models.loc[
-        raw_models[
-            "passes_vif"
-        ]
-    ]
-    .copy()
-)
+winner = acceptable_models.iloc[0]
 
 
-high_vif_models = (
-    raw_models.loc[
-        ~raw_models[
-            "passes_vif"
-        ]
-    ]
-    .copy()
-)
-
-
-low_vif_models.head(
-    TOP_MODELS_TO_SAVE
-).to_csv(
-    RAW_TOP_LOW_VIF_PATH,
-    index=False,
-)
-
-
-high_vif_models.head(
-    TOP_MODELS_TO_SAVE
-).to_csv(
-    RAW_TOP_HIGH_VIF_PATH,
-    index=False,
-)
+selected_features = [
+    winner["feature_1"],
+    winner["feature_2"],
+    winner["feature_3"],
+]
 
 
 print(
-    "\nRaw search complete."
-)
-
-print(
-    f"  total models: "
-    f"{len(raw_models):,}"
-)
-
-print(
-    f"  VIF <= {VIF_THRESHOLD:g}: "
-    f"{len(low_vif_models):,}"
-)
-
-print(
-    f"  VIF > {VIF_THRESHOLD:g}: "
-    f"{len(high_vif_models):,}"
+    "\n"
+    "============================================================\n"
+    "SELECTED NL DIAGNOSTIC SPECIFICATION\n"
+    "============================================================"
 )
 
 
-if not low_vif_models.empty:
-
-    print(
-        "\nBest low-VIF raw model:"
-    )
-
-    print(
-        low_vif_models[
-            [
-                "feature_1",
-                "feature_2",
-                "feature_3",
-                "cv_r2_oof",
-                "cv_r2_fold_mean",
-                "cv_r2_fold_std",
-                "adjusted_r2",
-                "max_vif",
-            ]
-        ]
-        .head(1)
-        .to_string(
-            index=False
-        )
-    )
-
-
-if not high_vif_models.empty:
-
-    print(
-        "\nBest high-VIF raw model:"
-    )
-
-    print(
-        high_vif_models[
-            [
-                "feature_1",
-                "feature_2",
-                "feature_3",
-                "cv_r2_oof",
-                "cv_r2_fold_mean",
-                "cv_r2_fold_std",
-                "adjusted_r2",
-                "max_vif",
-            ]
-        ]
-        .head(1)
-        .to_string(
-            index=False
-        )
-    )
-
-
-# =====================================================================
-# 5. Identify competitive high-VIF models
-# =====================================================================
-
-if low_vif_models.empty:
-
-    best_low_vif_r2 = (
-        raw_models[
-            "cv_r2_oof"
-        ].max()
-    )
-
-else:
-
-    best_low_vif_r2 = (
-        low_vif_models[
-            "cv_r2_oof"
-        ].max()
-    )
-
-
-contrast_threshold = (
-    best_low_vif_r2
-    - CONTRAST_MAX_CV_R2_GAP
-)
-
-
-contrast_sources = (
-    high_vif_models.loc[
-        high_vif_models[
-            "cv_r2_oof"
-        ]
-        >= contrast_threshold
-    ]
-    .head(
-        CONTRAST_SOURCE_TOP_N
-    )
-    .copy()
-)
-
-
-print(
-    "\nHigh-VIF contrast search:"
-)
-
-print(
-    f"  best low-VIF CV R²: "
-    f"{best_low_vif_r2:.3f}"
-)
-
-print(
-    f"  inspect high-VIF models with CV R² >= "
-    f"{contrast_threshold:.3f}"
-)
-
-print(
-    f"  source models retained: "
-    f"{len(contrast_sources):,}"
-)
-
-
-# =====================================================================
-# 6. Generate interpretable window-contrast candidates
-# =====================================================================
-
-contrast_specs = {}
-
-for _, raw_model in (
-    contrast_sources.iterrows()
-):
-
-    features = [
-        raw_model[
-            "feature_1"
-        ],
-        raw_model[
-            "feature_2"
-        ],
-        raw_model[
-            "feature_3"
-        ],
-    ]
-
-
-    for (
-        feature_a,
-        feature_b,
-    ) in combinations(
-        features,
-        2,
-    ):
-
-        pair = identify_window_pair(
-            feature_a,
-            feature_b,
-            catalogue_lookup,
-        )
-
-
-        if pair is None:
-            continue
-
-
-        (
-            local_feature,
-            global_feature,
-        ) = pair
-
-
-        third_feature = next(
-            feature
-            for feature
-            in features
-            if feature
-            not in {
-                local_feature,
-                global_feature,
-            }
-        )
-
-
-        key = (
-            local_feature,
-            global_feature,
-            third_feature,
-        )
-
-
-        # Keep the strongest raw source if the same transformed
-        # specification is generated more than once.
-        previous = contrast_specs.get(
-            key
-        )
-
-
-        candidate_info = {
-            "local_feature":
-                local_feature,
-            "global_feature":
-                global_feature,
-            "third_feature":
-                third_feature,
-
-            "source_raw_rank":
-                int(
-                    raw_model[
-                        "raw_rank"
-                    ]
-                ),
-
-            "source_raw_cv_r2":
-                float(
-                    raw_model[
-                        "cv_r2_oof"
-                    ]
-                ),
-
-            "source_raw_max_vif":
-                float(
-                    raw_model[
-                        "max_vif"
-                    ]
-                ),
-        }
-
-
-        if (
-            previous is None
-            or candidate_info[
-                "source_raw_cv_r2"
-            ]
-            >
-            previous[
-                "source_raw_cv_r2"
-            ]
-        ):
-
-            contrast_specs[
-                key
-            ] = candidate_info
-
-
-contrast_specs = list(
-    contrast_specs.values()
-)
-
-
-print(
-    "  unique interpretable contrast specifications:",
-    f"{len(contrast_specs):,}",
-)
-
-
-# =====================================================================
-# 7. Evaluate contrast reparameterisations
-# =====================================================================
-
-contrast_rows = []
-
-contrast_start = (
-    time.perf_counter()
-)
-
-total_contrasts = len(
-    contrast_specs
-)
-
-
-for i, spec in enumerate(
-    contrast_specs,
+for j, feature in enumerate(
+    selected_features,
     start=1,
 ):
-
-    local_feature = (
-        spec[
-            "local_feature"
-        ]
-    )
-
-    global_feature = (
-        spec[
-            "global_feature"
-        ]
-    )
-
-    third_feature = (
-        spec[
-            "third_feature"
-        ]
-    )
+    print(f"x{j}: {feature}")
 
 
-    local_values = (
-        analysis[
-            local_feature
-        ].to_numpy(
-            dtype=float
-        )
-    )
+print(f"\nNL blocked-CV R²: {winner['cv_r2_oof']:.4f}")
 
-    global_values = (
-        analysis[
-            global_feature
-        ].to_numpy(
-            dtype=float
-        )
-    )
+print(f"NL mean fold R²: {winner['cv_r2_fold_mean']:.4f}")
 
-    third_values = (
-        analysis[
-            third_feature
-        ].to_numpy(
-            dtype=float
-        )
-    )
+print(f"NL fold R² std: {winner['cv_r2_fold_std']:.4f}")
 
+print(f"NL in-sample adjusted R²: {winner['adjusted_r2']:.4f}")
 
-    contrast_values = (
-        local_values
-        - global_values
-    )
-
-
-    # Reparameterised model:
-    #
-    #   global
-    #   local - global
-    #   third
-    #
-    # This spans exactly the same information as:
-    #
-    #   local
-    #   global
-    #   third
-
-    X = np.column_stack(
-        [
-            global_values,
-            contrast_values,
-            third_values,
-        ]
-    )
-
-
-    valid = (
-        np.isfinite(y)
-        &
-        np.all(
-            np.isfinite(
-                X
-            ),
-            axis=1,
-        )
-    )
-
-
-    n = int(
-        valid.sum()
-    )
-
-
-    if (
-        n
-        >= minimum_cases
-    ):
-
-        vif = calculate_vif(
-            X[
-                valid
-            ]
-        )
-
-
-        max_vif = float(
-            np.nanmax(
-                vif
-            )
-        )
-
-
-        passes_vif = bool(
-            np.isfinite(
-                max_vif
-            )
-            and max_vif
-            <= VIF_THRESHOLD
-        )
-
-
-        beta, _, r2, adj_r2 = (
-            fit_ols_full(
-                X[
-                    valid
-                ],
-                y[
-                    valid
-                ],
-            )
-        )
-
-
-        cv = cross_validated_r2(
-            X,
-            y,
-            splits,
-        )
-
-
-        contrast_name = (
-            f"({local_feature})"
-            f"_minus_"
-            f"({global_feature})"
-        )
-
-
-        contrast_rows.append(
-            {
-                "global_feature":
-                    global_feature,
-
-                "contrast_feature":
-                    contrast_name,
-
-                "local_source_feature":
-                    local_feature,
-
-                "third_feature":
-                    third_feature,
-
-                "n":
-                    n,
-
-                "r2":
-                    r2,
-
-                "adjusted_r2":
-                    adj_r2,
-
-                **cv,
-
-                "intercept":
-                    beta[0],
-
-                "beta_global":
-                    beta[1],
-
-                "beta_contrast":
-                    beta[2],
-
-                "beta_third":
-                    beta[3],
-
-                "vif_global":
-                    vif[0],
-
-                "vif_contrast":
-                    vif[1],
-
-                "vif_third":
-                    vif[2],
-
-                "max_vif":
-                    max_vif,
-
-                "passes_vif":
-                    passes_vif,
-
-                "source_raw_rank":
-                    spec[
-                        "source_raw_rank"
-                    ],
-
-                "source_raw_cv_r2":
-                    spec[
-                        "source_raw_cv_r2"
-                    ],
-
-                "source_raw_max_vif":
-                    spec[
-                        "source_raw_max_vif"
-                    ],
-
-                "vif_reduction":
-                    (
-                        spec[
-                            "source_raw_max_vif"
-                        ]
-                        - max_vif
-                    ),
-            }
-        )
-
-
-    if (
-        total_contrasts
-        > 0
-        and (
-            i
-            % CONTRAST_PROGRESS_EVERY
-            == 0
-            or i
-            == total_contrasts
-        )
-    ):
-
-        report_progress(
-            done=i,
-            total=total_contrasts,
-            start_time=contrast_start,
-            label="contrast search",
-        )
+print(f"Maximum VIF: {winner['max_vif']:.3f}")
 
 
 # =====================================================================
-# 8. Save transformed models
+# 5. Fit selected model to ALL NL
 # =====================================================================
 
-if contrast_rows:
-
-    contrast_models = (
-        pd.DataFrame(
-            contrast_rows
-        )
-        .sort_values(
-            [
-                "cv_r2_oof",
-                "max_vif",
-            ],
-            ascending=[
-                False,
-                True,
-            ],
-        )
-        .reset_index(
-            drop=True
-        )
-    )
+X_nl = development[selected_features].to_numpy(dtype=float)
 
 
-    contrast_models.to_parquet(
-        CONTRAST_ALL_PATH,
-        index=False,
-    )
+y_nl = development["target"].to_numpy(dtype=float)
 
 
-    contrast_models.head(
-        TOP_MODELS_TO_SAVE
-    ).to_csv(
-        CONTRAST_TOP_PATH,
-        index=False,
-    )
-
-
-    print(
-        "\nContrast search complete."
-    )
-
-    print(
-        f"  transformed models: "
-        f"{len(contrast_models):,}"
-    )
-
-    print(
-        f"  transformed models with "
-        f"VIF <= {VIF_THRESHOLD:g}: "
-        f"{contrast_models['passes_vif'].sum():,}"
-    )
-
-
-    print(
-        "\nTop 20 transformed candidates:\n"
-    )
-
-    print(
-        contrast_models[
-            [
-                "global_feature",
-                "contrast_feature",
-                "third_feature",
-                "cv_r2_oof",
-                "cv_r2_fold_mean",
-                "cv_r2_fold_std",
-                "adjusted_r2",
-                "source_raw_max_vif",
-                "max_vif",
-                "vif_reduction",
-            ]
-        ]
-        .head(20)
-        .to_string(
-            index=False
-        )
-    )
-
-
-else:
-
-    contrast_models = (
-        pd.DataFrame()
-    )
-
-    print(
-        "\nNo interpretable same-metric / "
-        "different-window high-VIF contrasts were found."
-    )
-
-
-# =====================================================================
-# 9. Raw summaries
-# =====================================================================
-
-print(
-    "\nTop 20 LOW-VIF raw candidates:\n"
+valid_nl = np.isfinite(y_nl) & np.all(
+    np.isfinite(X_nl),
+    axis=1,
 )
 
+
+beta_nl = fit_ols(
+    X_nl[valid_nl],
+    y_nl[valid_nl],
+)
+
+
+nl_fitted = predict_ols(
+    X_nl[valid_nl],
+    beta_nl,
+)
+
+
+nl_fit_metrics = prediction_metrics(
+    y_nl[valid_nl],
+    nl_fitted,
+)
+
+
+print("\nNL coefficients:")
+
+print(f"  intercept = {beta_nl[0]: .8f}")
+
+for i, feature in enumerate(
+    selected_features,
+    start=1,
+):
+    print(f"  beta_{i} = {beta_nl[i]: .8f}    [{feature}]")
+
+
+# =====================================================================
+# 6. VALIDATE — apply NL coefficients directly to BE
+# =====================================================================
+
+X_be = validation[selected_features].to_numpy(dtype=float)
+
+
+y_be = validation["target"].to_numpy(dtype=float)
+
+
+valid_be = np.isfinite(y_be) & np.all(
+    np.isfinite(X_be),
+    axis=1,
+)
+
+
+y_be_pred = predict_ols(
+    X_be[valid_be],
+    beta_nl,
+)
+
+
+be_metrics = prediction_metrics(
+    y_be[valid_be],
+    y_be_pred,
+)
+
+
 print(
-    low_vif_models[
-        [
-            "feature_1",
-            "feature_2",
-            "feature_3",
-            "cv_r2_oof",
-            "cv_r2_fold_mean",
-            "cv_r2_fold_std",
-            "adjusted_r2",
-            "max_vif",
-        ]
+    "\n"
+    "============================================================\n"
+    "BE EXTERNAL VALIDATION USING UNCHANGED NL COEFFICIENTS\n"
+    "============================================================"
+)
+
+
+print(f"n = {be_metrics['n']}")
+
+print(f"Predictive R² = {be_metrics['r2']:.4f}")
+
+print(f"RMSE = {be_metrics['rmse']:.6f}")
+
+print(f"MAE = {be_metrics['mae']:.6f}")
+
+print(f"Mean prediction error = {be_metrics['mean_prediction_error']:.6f}")
+
+
+# ---------------------------------------------------------------------
+# Save individual BE predictions
+# ---------------------------------------------------------------------
+
+be_output = validation.loc[
+    valid_be,
+    [
+        "country",
+        "proxy_weight",
+        "cv_group",
+    ],
+].copy()
+
+
+be_output["observed_capacity_error"] = y_be[valid_be]
+
+
+be_output["predicted_capacity_error"] = y_be_pred
+
+
+be_output["prediction_error"] = (
+    be_output["predicted_capacity_error"] - be_output["observed_capacity_error"]
+)
+
+
+be_output.to_csv(
+    VALIDATION_PREDICTIONS_PATH,
+    index=True,
+)
+
+
+# ---------------------------------------------------------------------
+# Save validation summary
+# ---------------------------------------------------------------------
+
+validation_summary = pd.DataFrame(
+    [
+        {
+            "development_country": DEVELOPMENT_COUNTRY,
+            "validation_country": VALIDATION_COUNTRY,
+            "selected_feature_1": selected_features[0],
+            "selected_feature_2": selected_features[1],
+            "selected_feature_3": selected_features[2],
+            "nl_cv_r2": winner["cv_r2_oof"],
+            "nl_max_vif": winner["max_vif"],
+            "validation_n": be_metrics["n"],
+            "validation_r2": be_metrics["r2"],
+            "validation_rmse": be_metrics["rmse"],
+            "validation_mae": be_metrics["mae"],
+            "validation_mean_prediction_error": be_metrics["mean_prediction_error"],
+        }
     ]
-    .head(20)
-    .to_string(
-        index=False
+)
+
+
+validation_summary.to_csv(
+    VALIDATION_SUMMARY_PATH,
+    index=False,
+)
+
+
+# =====================================================================
+# 7. Validation figure
+# =====================================================================
+
+fig, ax = plt.subplots(
+    figsize=(
+        5.5,
+        5.5,
     )
 )
 
 
-print(
-    "\nTop 20 HIGH-VIF raw candidates:\n"
+ax.scatter(
+    y_be[valid_be],
+    y_be_pred,
+    alpha=0.6,
 )
 
-print(
-    high_vif_models[
+
+plot_min = float(
+    min(
+        np.min(y_be[valid_be]),
+        np.min(y_be_pred),
+    )
+)
+
+
+plot_max = float(
+    max(
+        np.max(y_be[valid_be]),
+        np.max(y_be_pred),
+    )
+)
+
+
+padding = 0.05 * (plot_max - plot_min)
+
+
+plot_min -= padding
+plot_max += padding
+
+
+ax.plot(
+    [
+        plot_min,
+        plot_max,
+    ],
+    [
+        plot_min,
+        plot_max,
+    ],
+    linestyle="--",
+)
+
+
+ax.set_xlim(
+    plot_min,
+    plot_max,
+)
+
+ax.set_ylim(
+    plot_min,
+    plot_max,
+)
+
+
+ax.set_xlabel("Observed signed LDES capacity error")
+
+ax.set_ylabel("Diagnostic-predicted signed LDES capacity error")
+
+
+ax.set_title("NL-trained diagnostic applied to BE")
+
+
+ax.text(
+    0.04,
+    0.96,
+    (f"$R^2$ = {be_metrics['r2']:.2f}\nn = {be_metrics['n']}"),
+    transform=ax.transAxes,
+    va="top",
+)
+
+
+fig.tight_layout()
+
+
+fig.savefig(
+    VALIDATION_FIGURE_PATH,
+    dpi=300,
+    bbox_inches="tight",
+)
+
+
+plt.close(fig)
+
+
+# =====================================================================
+# 8. FINAL REFIT — same predictors, NL + BE
+# =====================================================================
+
+pooled = analysis.loc[
+    analysis["country"].isin(
         [
-            "feature_1",
-            "feature_2",
-            "feature_3",
-            "cv_r2_oof",
-            "cv_r2_fold_mean",
-            "cv_r2_fold_std",
-            "adjusted_r2",
-            "max_vif",
+            DEVELOPMENT_COUNTRY,
+            VALIDATION_COUNTRY,
         ]
-    ]
-    .head(20)
-    .to_string(
-        index=False
     )
+].copy()
+
+
+X_pooled = pooled[selected_features].to_numpy(dtype=float)
+
+
+y_pooled = pooled["target"].to_numpy(dtype=float)
+
+
+valid_pooled = np.isfinite(y_pooled) & np.all(
+    np.isfinite(X_pooled),
+    axis=1,
+)
+
+
+beta_pooled = fit_ols(
+    X_pooled[valid_pooled],
+    y_pooled[valid_pooled],
+)
+
+
+y_pooled_pred = predict_ols(
+    X_pooled[valid_pooled],
+    beta_pooled,
+)
+
+
+pooled_metrics = prediction_metrics(
+    y_pooled[valid_pooled],
+    y_pooled_pred,
+)
+
+
+pooled_vif = calculate_vif(X_pooled[valid_pooled])
+
+
+print(
+    "\n"
+    "============================================================\n"
+    "FINAL NL + BE REFIT\n"
+    "============================================================"
+)
+
+
+print("\nPredictor specification remains FIXED:")
+
+
+for j, feature in enumerate(
+    selected_features,
+    start=1,
+):
+    print(f"x{j}: {feature}")
+
+
+print("\nFinal pooled coefficients:")
+
+print(f"  intercept = {beta_pooled[0]: .8f}")
+
+
+for i, feature in enumerate(
+    selected_features,
+    start=1,
+):
+    print(f"  beta_{i} = {beta_pooled[i]: .8f}    [{feature}]")
+
+
+print(f"\nPooled n = {pooled_metrics['n']}")
+
+print(f"Pooled fitted R² = {pooled_metrics['r2']:.4f}")
+
+print(f"Final maximum VIF = {np.max(pooled_vif):.3f}")
+
+
+# ---------------------------------------------------------------------
+# Save final coefficients
+# ---------------------------------------------------------------------
+
+coefficient_rows = [
+    {
+        "term": "intercept",
+        "feature": "intercept",
+        "coefficient": beta_pooled[0],
+        "vif": np.nan,
+    }
+]
+
+
+for i, feature in enumerate(
+    selected_features,
+    start=1,
+):
+    coefficient_rows.append(
+        {
+            "term": f"x{i}",
+            "feature": feature,
+            "coefficient": beta_pooled[i],
+            "vif": pooled_vif[i - 1],
+        }
+    )
+
+
+final_coefficients = pd.DataFrame(coefficient_rows)
+
+
+final_coefficients.to_csv(
+    FINAL_COEFFICIENTS_PATH,
+    index=False,
 )
 
 
 # =====================================================================
-# 10. Predictor frequency among strong low-VIF models
+# 9. Save complete selected-model metadata
 # =====================================================================
 
-top_frequency_models = (
-    low_vif_models.head(
-        min(
-            100,
-            len(
-                low_vif_models
-            ),
-        )
-    )
-)
+selected_model_metadata = {
+    "development_country": DEVELOPMENT_COUNTRY,
+    "validation_country": VALIDATION_COUNTRY,
+    "proxy_weight_selection": str(PROXY_WEIGHT),
+    "normalisation_basis": NORMALISATION_BASIS,
+    "cv_group_fields": CV_GROUP_FIELDS,
+    "selected_features": selected_features,
+    "development": {
+        "n": int(valid_nl.sum()),
+        "blocked_cv_r2": float(winner["cv_r2_oof"]),
+        "blocked_cv_fold_mean": float(winner["cv_r2_fold_mean"]),
+        "blocked_cv_fold_std": float(winner["cv_r2_fold_std"]),
+        "max_vif": float(winner["max_vif"]),
+        "coefficients": beta_nl.tolist(),
+    },
+    "validation": {
+        "n": be_metrics["n"],
+        "r2": be_metrics["r2"],
+        "rmse": be_metrics["rmse"],
+        "mae": be_metrics["mae"],
+        "mean_prediction_error": be_metrics["mean_prediction_error"],
+    },
+    "final_pooled_refit": {
+        "n": pooled_metrics["n"],
+        "fitted_r2": pooled_metrics["r2"],
+        "max_vif": float(np.max(pooled_vif)),
+        "coefficients": beta_pooled.tolist(),
+    },
+}
 
 
-if not top_frequency_models.empty:
-
-    frequency = (
-        pd.concat(
-            [
-                top_frequency_models[
-                    "feature_1"
-                ],
-                top_frequency_models[
-                    "feature_2"
-                ],
-                top_frequency_models[
-                    "feature_3"
-                ],
-            ]
-        )
-        .value_counts()
-    )
-
-
-    print(
-        "\nPredictor frequency among top "
-        f"{len(top_frequency_models)} "
-        "low-VIF raw models:\n"
-    )
-
-
-    print(
-        frequency.head(
-            30
-        ).to_string()
+with open(
+    SELECTED_MODEL_PATH,
+    "w",
+    encoding="utf-8",
+) as file:
+    json.dump(
+        selected_model_metadata,
+        file,
+        indent=2,
     )
 
 
 # =====================================================================
-# Final paths
+# Final output summary
 # =====================================================================
 
-print(
-    "\nSaved outputs:"
-)
+print("\nSaved outputs:")
 
-print(
-    f"  {SINGLE_RESULTS_PATH}"
-)
+print(f"  {SINGLE_RESULTS_PATH}")
 
-print(
-    f"  {RAW_ALL_PATH}"
-)
+print(f"  {SEARCH_ALL_PATH}")
 
-print(
-    f"  {RAW_TOP_LOW_VIF_PATH}"
-)
+print(f"  {SEARCH_TOP_PATH}")
 
-print(
-    f"  {RAW_TOP_HIGH_VIF_PATH}"
-)
+print(f"  {VALIDATION_PREDICTIONS_PATH}")
 
-if contrast_rows:
+print(f"  {VALIDATION_SUMMARY_PATH}")
 
-    print(
-        f"  {CONTRAST_ALL_PATH}"
-    )
+print(f"  {VALIDATION_FIGURE_PATH}")
 
-    print(
-        f"  {CONTRAST_TOP_PATH}"
-    )
+print(f"  {FINAL_COEFFICIENTS_PATH}")
+
+print(f"  {SELECTED_MODEL_PATH}")

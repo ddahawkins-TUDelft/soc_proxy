@@ -43,7 +43,11 @@ METRICS = [
     ("ldes_capacity_error_pct", "(a) LDES capacity error", "Capacity error (%)"),
     ("macme_capex_weighted_pct", "(b) CAPEX-weighted MACME", "Weighted MACME (%)"),
     # ("soc_delta_nrmse_pct", "(c) CEM SoC-delta error", "SoC delta nRMSE (%)"),
-    ("ldes_abs_error_improvement_pp","(c) Improvement in LDES capacity error","Reduction in absolute capacity error (pp)"),
+    (
+        "ldes_abs_error_improvement_pp",
+        "(c) Improvement in LDES capacity error",
+        "Reduction in absolute capacity error (pp)",
+    ),
     ("runtime_method_seconds", "(d) Workflow runtime", "Runtime (s)"),
 ]
 
@@ -111,9 +115,9 @@ def pivot_investment_metrics(investment: pd.DataFrame) -> pd.DataFrame:
         keep=False,
     )
     if duplicated.any():
-        duplicates = investment.loc[
-            duplicated, ["case_id", "metric"]
-        ].sort_values(["case_id", "metric"])
+        duplicates = investment.loc[duplicated, ["case_id", "metric"]].sort_values(
+            ["case_id", "metric"]
+        )
         raise ValueError(
             "investment_metrics.parquet contains duplicate "
             "(case_id, metric) rows:\n"
@@ -168,17 +172,13 @@ def extract_soc_delta_nrmse(signals: pd.DataFrame) -> pd.DataFrame:
 
     duplicated = selected["case_id"].duplicated(keep=False)
     if duplicated.any():
-        duplicate_ids = sorted(
-            selected.loc[duplicated, "case_id"].astype(str).unique()
-        )
+        duplicate_ids = sorted(selected.loc[duplicated, "case_id"].astype(str).unique())
         raise ValueError(
             "Expected one full-horizon CEM delta nRMSE row per case, "
             "but found duplicates for:\n" + "\n".join(duplicate_ids[:20])
         )
 
-    return selected[["case_id", "value"]].rename(
-        columns={"value": "soc_delta_nrmse"}
-    )
+    return selected[["case_id", "value"]].rename(columns={"value": "soc_delta_nrmse"})
 
 
 def load_results(results_dir: Path, country: str) -> pd.DataFrame:
@@ -208,16 +208,13 @@ def load_results(results_dir: Path, country: str) -> pd.DataFrame:
 
     # Results/10_year may contain historical or side-experiment methods.
     # This figure deliberately isolates the selected paper method.
-    method_mask = (
-        parameters["cluster_method"].astype(str).str.lower().eq("kmeans")
-        & parameters["representation_method"].astype(str).str.lower().eq("medoid")
-    )
+    method_mask = parameters["cluster_method"].astype(str).str.lower().eq(
+        "kmeans"
+    ) & parameters["representation_method"].astype(str).str.lower().eq("medoid")
     parameters = parameters.loc[method_mask].copy()
 
     if parameters.empty:
-        raise ValueError(
-            "No k-means + medoid cases were found in parameters.parquet."
-        )
+        raise ValueError("No k-means + medoid cases were found in parameters.parquet.")
 
     if country != "both":
         parameters = parameters.loc[
@@ -271,12 +268,8 @@ def load_results(results_dir: Path, country: str) -> pd.DataFrame:
     data["k_periods"] = data["k_periods"].astype(int)
     data["lambda_soc"] = data["lambda_soc"].astype(float)
 
-    data["ldes_capacity_error_pct"] = (
-        100.0 * data["ldes_capacity_error_signed"]
-    )
-    data["macme_capex_weighted_pct"] = (
-        100.0 * data["macme_capex_weighted_annualised"]
-    )
+    data["ldes_capacity_error_pct"] = 100.0 * data["ldes_capacity_error_signed"]
+    data["macme_capex_weighted_pct"] = 100.0 * data["macme_capex_weighted_annualised"]
     data["soc_delta_nrmse_pct"] = 100.0 * data["soc_delta_nrmse"]
 
     # Pair each proxy-weight case with its otherwise-identical W_P = 0 case.
@@ -287,18 +280,10 @@ def load_results(results_dir: Path, country: str) -> pd.DataFrame:
         "k_periods",
     ]
 
-    baseline = (
-        data.loc[
-            np.isclose(data["lambda_soc"], 0.0),
-            pair_columns + ["ldes_capacity_error_pct"],
-        ]
-        .rename(
-            columns={
-                "ldes_capacity_error_pct":
-                    "ldes_capacity_error_baseline_pct"
-            }
-        )
-    )
+    baseline = data.loc[
+        np.isclose(data["lambda_soc"], 0.0),
+        pair_columns + ["ldes_capacity_error_pct"],
+    ].rename(columns={"ldes_capacity_error_pct": "ldes_capacity_error_baseline_pct"})
 
     data = data.merge(
         baseline,
@@ -330,9 +315,7 @@ def load_results(results_dir: Path, country: str) -> pd.DataFrame:
 def validate_experiment(data: pd.DataFrame) -> None:
     """Print dimensions and validate plotting inputs."""
     countries = sorted(str(x) for x in data["country"].dropna().unique())
-    horizons = sorted(
-        int(x) for x in data["horizon_start_year"].dropna().unique()
-    )
+    horizons = sorted(int(x) for x in data["horizon_start_year"].dropna().unique())
     ks = sorted(int(x) for x in data["k_periods"].dropna().unique())
     weights = sorted(float(x) for x in data["lambda_soc"].dropna().unique())
 
@@ -369,9 +352,7 @@ def build_wp_colours(weights: list[float]) -> dict[float, object]:
     if any(np.isclose(weight, 0.0) for weight in weights):
         colours[0.0] = "0.72"
 
-    positive = sorted(
-        weight for weight in weights if not np.isclose(weight, 0.0)
-    )
+    positive = sorted(weight for weight in weights if not np.isclose(weight, 0.0))
     if positive:
         cmap = plt.get_cmap("plasma")
         positions = np.linspace(0.18, 0.88, len(positive))
@@ -439,9 +420,9 @@ def plot_metric(
         k_x = k_positions[k]
 
         for wp in wp_values:
-            wp_data = k_data.loc[
-                np.isclose(k_data["lambda_soc"], wp)
-            ].dropna(subset=[value_column])
+            wp_data = k_data.loc[np.isclose(k_data["lambda_soc"], wp)].dropna(
+                subset=[value_column]
+            )
 
             if wp_data.empty:
                 continue
@@ -450,8 +431,7 @@ def plot_metric(
 
             xs = np.array(
                 [
-                    centre
-                    + replicate_jitter[(str(country), int(year))]
+                    centre + replicate_jitter[(str(country), int(year))]
                     for country, year in zip(
                         wp_data["country"],
                         wp_data["horizon_start_year"],
@@ -546,9 +526,7 @@ def plot_metric(
 def make_figure(data: pd.DataFrame, *, country_selection: str) -> plt.Figure:
     k_values = sorted(int(k) for k in data["k_periods"].unique())
     wp_values = [
-        weight
-        for weight in WP_ORDER
-        if any(np.isclose(data["lambda_soc"], weight))
+        weight for weight in WP_ORDER if any(np.isclose(data["lambda_soc"], weight))
     ]
 
     if not k_values:

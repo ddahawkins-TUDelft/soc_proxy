@@ -110,7 +110,7 @@ WINDOWS = [
     548,
     730,
     912,
-    None,   # Full horizon
+    None,  # Full horizon
 ]
 
 FAMILY_LABELS = {
@@ -132,6 +132,7 @@ METRIC_LABELS = {
 # =====================================================================
 # Helpers
 # =====================================================================
+
 
 def fit_single_predictor(
     x: pd.Series,
@@ -180,12 +181,7 @@ def fit_single_predictor(
     else:
         r2 = 1 - residual_ss / total_ss
 
-        adjusted_r2 = (
-            1
-            - (1 - r2)
-            * (n - 1)
-            / (n - p - 1)
-        )
+        adjusted_r2 = 1 - (1 - r2) * (n - 1) / (n - p - 1)
 
     return {
         "n": n,
@@ -239,9 +235,7 @@ def extract_proxy_weights(
 
     for column in weight_aliases:
         if column in parameters.columns:
-            result = parameters[
-                ["case_id", column]
-            ].copy()
+            result = parameters[["case_id", column]].copy()
 
             result = result.rename(
                 columns={
@@ -250,7 +244,6 @@ def extract_proxy_weights(
             )
 
             return result.drop_duplicates()
-
 
     # -------------------------------------------------------------
     # Long-format parameters.parquet
@@ -264,23 +257,12 @@ def extract_proxy_weights(
     ]
 
     name_column = next(
-        (
-            column
-            for column in parameter_name_columns
-            if column in parameters.columns
-        ),
+        (column for column in parameter_name_columns if column in parameters.columns),
         None,
     )
 
-    if (
-        name_column is not None
-        and "value" in parameters.columns
-    ):
-        mask = (
-            parameters[name_column]
-            .astype(str)
-            .isin(weight_aliases)
-        )
+    if name_column is not None and "value" in parameters.columns:
+        mask = parameters[name_column].astype(str).isin(weight_aliases)
 
         result = (
             parameters.loc[
@@ -298,7 +280,6 @@ def extract_proxy_weights(
         if not result.empty:
             return result.drop_duplicates()
 
-
     raise ValueError(
         "Could not identify W_P in parameters.parquet.\n"
         f"Available columns: {parameters.columns.tolist()}\n"
@@ -314,10 +295,7 @@ if CAPACITY_ERROR not in {
     "signed",
     "absolute",
 }:
-    raise ValueError(
-        "CAPACITY_ERROR must be either "
-        "'signed' or 'absolute'."
-    )
+    raise ValueError("CAPACITY_ERROR must be either 'signed' or 'absolute'.")
 
 
 # =====================================================================
@@ -326,15 +304,9 @@ if CAPACITY_ERROR not in {
 
 CONFIG_LABEL = configuration_label()
 
-RESULTS_TABLE_PATH = (
-    RESULTS_DIR
-    / f"single_predictor_diagnostics_{CONFIG_LABEL}.csv"
-)
+RESULTS_TABLE_PATH = RESULTS_DIR / f"single_predictor_diagnostics_{CONFIG_LABEL}.csv"
 
-FIGURE_PATH = (
-    RESULTS_DIR
-    / f"single_predictor_diagnostics_{CONFIG_LABEL}.png"
-)
+FIGURE_PATH = RESULTS_DIR / f"single_predictor_diagnostics_{CONFIG_LABEL}.png"
 
 
 # =====================================================================
@@ -342,28 +314,20 @@ FIGURE_PATH = (
 # =====================================================================
 
 print(f"Reading {SIGNAL_METRICS_PATH}")
-signal_metrics = pd.read_parquet(
-    SIGNAL_METRICS_PATH
-)
+signal_metrics = pd.read_parquet(SIGNAL_METRICS_PATH)
 
 print(f"Reading {INVESTMENT_METRICS_PATH}")
-investment_metrics = pd.read_parquet(
-    INVESTMENT_METRICS_PATH
-)
+investment_metrics = pd.read_parquet(INVESTMENT_METRICS_PATH)
 
 print(f"Reading {PARAMETERS_PATH}")
-parameters = pd.read_parquet(
-    PARAMETERS_PATH
-)
+parameters = pd.read_parquet(PARAMETERS_PATH)
 
 
 # =====================================================================
 # Extract proxy weight
 # =====================================================================
 
-proxy_weights = extract_proxy_weights(
-    parameters
-)
+proxy_weights = extract_proxy_weights(parameters)
 
 proxy_weights["proxy_weight"] = pd.to_numeric(
     proxy_weights["proxy_weight"],
@@ -372,15 +336,9 @@ proxy_weights["proxy_weight"] = pd.to_numeric(
 
 
 # Make sure each case has only one W_P value.
-weight_counts = (
-    proxy_weights
-    .groupby("case_id")["proxy_weight"]
-    .nunique()
-)
+weight_counts = proxy_weights.groupby("case_id")["proxy_weight"].nunique()
 
-invalid_weights = weight_counts[
-    weight_counts > 1
-]
+invalid_weights = weight_counts[weight_counts > 1]
 
 if not invalid_weights.empty:
     raise ValueError(
@@ -388,20 +346,12 @@ if not invalid_weights.empty:
         f"Examples: {invalid_weights.index[:10].tolist()}"
     )
 
-proxy_weights = (
-    proxy_weights
-    .drop_duplicates(subset=["case_id"])
-)
+proxy_weights = proxy_weights.drop_duplicates(subset=["case_id"])
 
 
 print("\nProxy-weight distribution:")
 
-print(
-    proxy_weights["proxy_weight"]
-    .value_counts(dropna=False)
-    .sort_index()
-    .to_string()
-)
+print(proxy_weights["proxy_weight"].value_counts(dropna=False).sort_index().to_string())
 
 
 # =====================================================================
@@ -410,8 +360,7 @@ print(
 
 ldes_error = (
     investment_metrics.loc[
-        investment_metrics["metric"]
-        == OUTCOME_METRIC,
+        investment_metrics["metric"] == OUTCOME_METRIC,
         [
             "case_id",
             "value",
@@ -426,16 +375,12 @@ ldes_error = (
 )
 
 if ldes_error.empty:
-    raise ValueError(
-        f"No investment metric found with "
-        f"metric={OUTCOME_METRIC!r}"
-    )
+    raise ValueError(f"No investment metric found with metric={OUTCOME_METRIC!r}")
 
 if ldes_error["case_id"].duplicated().any():
     duplicates = (
         ldes_error.loc[
-            ldes_error["case_id"]
-            .duplicated(keep=False),
+            ldes_error["case_id"].duplicated(keep=False),
             "case_id",
         ]
         .unique()
@@ -451,15 +396,10 @@ if ldes_error["case_id"].duplicated().any():
 
 # Construct the requested target.
 if CAPACITY_ERROR == "signed":
-    ldes_error["ldes_capacity_error"] = (
-        ldes_error["ldes_capacity_error_signed"]
-    )
+    ldes_error["ldes_capacity_error"] = ldes_error["ldes_capacity_error_signed"]
 
 elif CAPACITY_ERROR == "absolute":
-    ldes_error["ldes_capacity_error"] = (
-        ldes_error["ldes_capacity_error_signed"]
-        .abs()
-    )
+    ldes_error["ldes_capacity_error"] = ldes_error["ldes_capacity_error_signed"].abs()
 
 
 # Attach W_P to outcome table.
@@ -477,8 +417,7 @@ if ldes_error["proxy_weight"].isna().any():
     ]
 
     raise ValueError(
-        "No proxy weight found for some cases. "
-        f"Examples: {missing.head(10).tolist()}"
+        f"No proxy weight found for some cases. Examples: {missing.head(10).tolist()}"
     )
 
 
@@ -487,43 +426,25 @@ if ldes_error["proxy_weight"].isna().any():
 # =====================================================================
 
 if PROXY_WEIGHT is not None:
-
     weight_mask = np.isclose(
         ldes_error["proxy_weight"].astype(float),
         float(PROXY_WEIGHT),
     )
 
-    ldes_error = (
-        ldes_error.loc[
-            weight_mask
-        ]
-        .copy()
-    )
+    ldes_error = ldes_error.loc[weight_mask].copy()
 
-    print(
-        f"\nFiltered to W_P = {PROXY_WEIGHT:g}"
-    )
+    print(f"\nFiltered to W_P = {PROXY_WEIGHT:g}")
 
 else:
-    print(
-        "\nUsing all W_P values."
-    )
+    print("\nUsing all W_P values.")
 
 
-print(
-    f"Outcome: {CAPACITY_ERROR} LDES capacity error"
-)
+print(f"Outcome: {CAPACITY_ERROR} LDES capacity error")
 
-print(
-    f"Cases retained: "
-    f"{ldes_error['case_id'].nunique():,}"
-)
+print(f"Cases retained: {ldes_error['case_id'].nunique():,}")
 
 if ldes_error.empty:
-    raise ValueError(
-        "No cases remain after applying "
-        "the proxy-weight filter."
-    )
+    raise ValueError("No cases remain after applying the proxy-weight filter.")
 
 
 # =====================================================================
@@ -531,12 +452,9 @@ if ldes_error.empty:
 # =====================================================================
 
 diagnostics = signal_metrics.loc[
-    signal_metrics["error_family"]
-    .isin(ERROR_FAMILIES)
-    & signal_metrics["signal_type"]
-    .isin(SIGNAL_TYPES)
-    & signal_metrics["metric"]
-    .isin(METRICS)
+    signal_metrics["error_family"].isin(ERROR_FAMILIES)
+    & signal_metrics["signal_type"].isin(SIGNAL_TYPES)
+    & signal_metrics["metric"].isin(METRICS)
 ].copy()
 
 
@@ -546,28 +464,11 @@ diagnostics = signal_metrics.loc[
 # Pearson:
 # dimensionless; therefore no normalisation basis.
 normalisation_mask = (
-    (
-        diagnostics["metric"]
-        .isin(["nmbe", "nrmse"])
-        & (
-            diagnostics["normalisation_basis"]
-            == "reference_proxy_full_range"
-        )
-    )
-    |
-    (
-        (
-            diagnostics["metric"]
-            == "pearson"
-        )
-        & diagnostics["normalisation_basis"]
-        .isna()
-    )
-)
+    diagnostics["metric"].isin(["nmbe", "nrmse"])
+    & (diagnostics["normalisation_basis"] == "reference_proxy_full_range")
+) | ((diagnostics["metric"] == "pearson") & diagnostics["normalisation_basis"].isna())
 
-diagnostics = diagnostics.loc[
-    normalisation_mask
-].copy()
+diagnostics = diagnostics.loc[normalisation_mask].copy()
 
 
 # =====================================================================
@@ -589,14 +490,9 @@ data = diagnostics.merge(
 )
 
 
-print(
-    f"Signal rows retained: {len(data):,}"
-)
+print(f"Signal rows retained: {len(data):,}")
 
-print(
-    f"Unique cases in regression dataset: "
-    f"{data['case_id'].nunique():,}"
-)
+print(f"Unique cases in regression dataset: {data['case_id'].nunique():,}")
 
 
 # =====================================================================
@@ -617,7 +513,6 @@ for group_values, group in data.groupby(
     dropna=False,
     observed=True,
 ):
-
     (
         error_family,
         signal_type,
@@ -635,8 +530,7 @@ for group_values, group in data.groupby(
             "error_family": error_family,
             "signal_type": signal_type,
             "metric": metric,
-            "window_half_width_days":
-                window_half_width_days,
+            "window_half_width_days": window_half_width_days,
             **regression,
         }
     )
@@ -656,28 +550,18 @@ results["family_label"] = [
             signal_type,
         )
     ]
-    for error_family, signal_type
-    in zip(
+    for error_family, signal_type in zip(
         results["error_family"],
         results["signal_type"],
     )
 ]
 
-results["metric_label"] = (
-    results["metric"]
-    .map(METRIC_LABELS)
-)
+results["metric_label"] = results["metric"].map(METRIC_LABELS)
 
-results["window_label"] = (
-    results["window_half_width_days"]
-    .map(window_label)
-)
+results["window_label"] = results["window_half_width_days"].map(window_label)
 
 
-WINDOW_LABELS = [
-    window_label(window)
-    for window in WINDOWS
-]
+WINDOW_LABELS = [window_label(window) for window in WINDOWS]
 
 FAMILY_ORDER = [
     "Proxy Approx.",
@@ -714,17 +598,13 @@ results["window_label"] = pd.Categorical(
 )
 
 
-results = (
-    results
-    .sort_values(
-        [
-            "family_label",
-            "metric_label",
-            "window_label",
-        ]
-    )
-    .reset_index(drop=True)
-)
+results = results.sort_values(
+    [
+        "family_label",
+        "metric_label",
+        "window_label",
+    ]
+).reset_index(drop=True)
 
 
 # =====================================================================
@@ -736,10 +616,7 @@ results.to_csv(
     index=False,
 )
 
-print(
-    f"\nSaved regression results to "
-    f"{RESULTS_TABLE_PATH}"
-)
+print(f"\nSaved regression results to {RESULTS_TABLE_PATH}")
 
 
 # =====================================================================
@@ -770,9 +647,7 @@ heatmap = heatmap.reindex(
 )
 
 
-heatmap = heatmap.reindex(
-    columns=WINDOW_LABELS
-)
+heatmap = heatmap.reindex(columns=WINDOW_LABELS)
 
 
 # =====================================================================
@@ -783,19 +658,12 @@ fig, ax = plt.subplots(
     figsize=(11, 8),
 )
 
-values = heatmap.to_numpy(
-    dtype=float
-)
+values = heatmap.to_numpy(dtype=float)
 
-finite_values = values[
-    np.isfinite(values)
-]
+finite_values = values[np.isfinite(values)]
 
 if finite_values.size == 0:
-    raise ValueError(
-        "No finite adjusted R² values "
-        "were produced."
-    )
+    raise ValueError("No finite adjusted R² values were produced.")
 
 
 # Keep zero meaningful while retaining any
@@ -825,11 +693,7 @@ image = ax.imshow(
 # X axis
 # ---------------------------------------------------------------------
 
-ax.set_xticks(
-    np.arange(
-        len(WINDOW_LABELS)
-    )
-)
+ax.set_xticks(np.arange(len(WINDOW_LABELS)))
 
 ax.set_xticklabels(
     WINDOW_LABELS,
@@ -837,30 +701,18 @@ ax.set_xticklabels(
     ha="right",
 )
 
-ax.set_xlabel(
-    "Window half-width around reference-proxy peak"
-)
+ax.set_xlabel("Window half-width around reference-proxy peak")
 
 
 # ---------------------------------------------------------------------
 # Y axis
 # ---------------------------------------------------------------------
 
-row_labels = [
-    f"{family}   {metric}"
-    for family, metric
-    in heatmap.index
-]
+row_labels = [f"{family}   {metric}" for family, metric in heatmap.index]
 
-ax.set_yticks(
-    np.arange(
-        len(row_labels)
-    )
-)
+ax.set_yticks(np.arange(len(row_labels)))
 
-ax.set_yticklabels(
-    row_labels
-)
+ax.set_yticklabels(row_labels)
 
 
 # ---------------------------------------------------------------------
@@ -888,9 +740,7 @@ colourbar = fig.colorbar(
     ax=ax,
 )
 
-colourbar.set_label(
-    "Single-predictor adjusted $R^2$"
-)
+colourbar.set_label("Single-predictor adjusted $R^2$")
 
 
 # ---------------------------------------------------------------------
@@ -900,15 +750,9 @@ colourbar.set_label(
 if PROXY_WEIGHT is None:
     weight_title = "all $W_P$"
 else:
-    weight_title = (
-        f"$W_P$ = {PROXY_WEIGHT:g}"
-    )
+    weight_title = f"$W_P$ = {PROXY_WEIGHT:g}"
 
-error_title = (
-    "signed"
-    if CAPACITY_ERROR == "signed"
-    else "absolute"
-)
+error_title = "signed" if CAPACITY_ERROR == "signed" else "absolute"
 
 ax.set_title(
     "Single-predictor explanatory power for "
@@ -921,13 +765,8 @@ ax.set_title(
 # Cell annotations
 # ---------------------------------------------------------------------
 
-for row_idx in range(
-    values.shape[0]
-):
-    for col_idx in range(
-        values.shape[1]
-    ):
-
+for row_idx in range(values.shape[0]):
+    for col_idx in range(values.shape[1]):
         value = values[
             row_idx,
             col_idx,
@@ -954,9 +793,7 @@ fig.savefig(
     bbox_inches="tight",
 )
 
-print(
-    f"Saved figure to {FIGURE_PATH}"
-)
+print(f"Saved figure to {FIGURE_PATH}")
 
 plt.show()
 
@@ -965,14 +802,10 @@ plt.show()
 # Print strongest individual predictors
 # =====================================================================
 
-print(
-    "\nTop 20 individual predictors "
-    "by adjusted R²:\n"
-)
+print("\nTop 20 individual predictors by adjusted R²:\n")
 
 top_predictors = (
-    results
-    .sort_values(
+    results.sort_values(
         "adjusted_r2",
         ascending=False,
     )
