@@ -89,9 +89,7 @@ METHOD_LABELS = {
     "hierarchical_medoid": "Hierarchical\n+ medoid",
     "kmeans_medoid": "k-means\n+ medoid",
     "hierarchical_distribution_local": "Hierarchical\n+ distribution",
-    "hierarchical_distribution_minmax_local": (
-        "Hierarchical\n+ distribution\nminmax"
-    ),
+    "hierarchical_distribution_minmax_local": ("Hierarchical\n+ distribution\nminmax"),
 }
 
 
@@ -164,9 +162,7 @@ def resolve_column(
         if candidate in frame.columns:
             return candidate
 
-    runtime_columns = sorted(
-        c for c in frame.columns if "runtime" in c.lower()
-    )
+    runtime_columns = sorted(c for c in frame.columns if "runtime" in c.lower())
     raise ValueError(
         f"Could not find the {purpose} column. "
         f"Tried: {list(candidates)}\n"
@@ -180,9 +176,8 @@ def filter_ten_year_runs(parameters: pd.DataFrame) -> pd.DataFrame:
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     parameters["horizon_years"] = (
-        (parameters["end_date"] - parameters["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     parameters = parameters.loc[
         np.isclose(
@@ -204,12 +199,7 @@ def infer_representation_scope(parameters: pd.DataFrame) -> pd.Series:
         if column in parameters.columns:
             return parameters[column].astype("string").str.lower().fillna("")
 
-    names = (
-        parameters["experiment_name"]
-        .astype("string")
-        .str.lower()
-        .fillna("")
-    )
+    names = parameters["experiment_name"].astype("string").str.lower().fillna("")
 
     scope = pd.Series("", index=parameters.index, dtype="string")
     scope.loc[names.str.contains("local", regex=False)] = "local"
@@ -224,13 +214,11 @@ def assign_method_key(parameters: pd.DataFrame) -> pd.Series:
 
     method_key = pd.Series(pd.NA, index=parameters.index, dtype="string")
 
-    method_key.loc[
-        cluster.eq("hierarchical") & representation.eq("medoid")
-    ] = "hierarchical_medoid"
+    method_key.loc[cluster.eq("hierarchical") & representation.eq("medoid")] = (
+        "hierarchical_medoid"
+    )
 
-    method_key.loc[
-        cluster.eq("kmeans") & representation.eq("medoid")
-    ] = "kmeans_medoid"
+    method_key.loc[cluster.eq("kmeans") & representation.eq("medoid")] = "kmeans_medoid"
 
     method_key.loc[
         cluster.eq("hierarchical")
@@ -296,7 +284,8 @@ def load_results(
     ].copy()
 
     missing_methods = [
-        method for method in METHOD_ORDER
+        method
+        for method in METHOD_ORDER
         if method not in set(selected["method_key"].dropna())
     ]
     if missing_methods:
@@ -313,14 +302,11 @@ def load_results(
 
     investment["case_id"] = investment["case_id"].astype(str)
     investment = investment.loc[
-        investment["case_id"].isin(case_ids)
-        & investment["metric"].eq(LDES_METRIC),
+        investment["case_id"].isin(case_ids) & investment["metric"].eq(LDES_METRIC),
         ["case_id", "value"],
     ].copy()
 
-    investment = investment.rename(
-        columns={"value": "ldes_capacity_error_signed"}
-    )
+    investment = investment.rename(columns={"value": "ldes_capacity_error_signed"})
 
     data = selected.merge(
         investment,
@@ -329,9 +315,7 @@ def load_results(
         validate="one_to_one",
     )
 
-    data["ldes_capacity_error_pct"] = (
-        100.0 * data["ldes_capacity_error_signed"]
-    )
+    data["ldes_capacity_error_pct"] = 100.0 * data["ldes_capacity_error_signed"]
     data["tsa_runtime_seconds"] = data[runtime_column].astype(float)
 
     return data, runtime_column
@@ -343,17 +327,14 @@ def summarise_metric(
     value_column: str,
     metric_name: str,
 ) -> pd.DataFrame:
-    summary = (
-        data.groupby(
-            ["method_key", "lambda_soc", "k_periods"],
-            as_index=False,
-        )
-        .agg(
-            n=(value_column, "size"),
-            q25=(value_column, lambda x: x.quantile(0.25)),
-            median=(value_column, "median"),
-            q75=(value_column, lambda x: x.quantile(0.75)),
-        )
+    summary = data.groupby(
+        ["method_key", "lambda_soc", "k_periods"],
+        as_index=False,
+    ).agg(
+        n=(value_column, "size"),
+        q25=(value_column, lambda x: x.quantile(0.25)),
+        median=(value_column, "median"),
+        q75=(value_column, lambda x: x.quantile(0.75)),
     )
     summary["metric"] = metric_name
     return summary
@@ -380,10 +361,7 @@ def build_summary(data: pd.DataFrame) -> pd.DataFrame:
 def build_k_colours(k_values: list[int]) -> dict[int, object]:
     cmap = plt.get_cmap("plasma")
     positions = np.linspace(PLASMA_MIN, PLASMA_MAX, len(k_values))
-    return {
-        k: cmap(position)
-        for k, position in zip(k_values, positions, strict=True)
-    }
+    return {k: cmap(position) for k, position in zip(k_values, positions, strict=True)}
 
 
 def build_wp_offsets() -> dict[float, float]:
@@ -423,9 +401,7 @@ def plot_summary_panel(
         method_x = method_positions[method]
 
         for wp in WP_ORDER:
-            wp_data = method_data.loc[
-                np.isclose(method_data["lambda_soc"], wp)
-            ]
+            wp_data = method_data.loc[np.isclose(method_data["lambda_soc"], wp)]
 
             for k in k_offsets:
                 row = wp_data.loc[wp_data["k_periods"].eq(k)]
@@ -434,11 +410,7 @@ def plot_summary_panel(
 
                 row = row.iloc[0]
 
-                centre = (
-                    method_x
-                    + wp_offsets[wp]
-                    + k_offsets[k]
-                )
+                centre = method_x + wp_offsets[wp] + k_offsets[k]
 
                 median = float(row["median"])
                 q25 = float(row["q25"])
@@ -447,9 +419,7 @@ def plot_summary_panel(
                 ax.errorbar(
                     centre,
                     median,
-                    yerr=np.array(
-                        [[median - q25], [q75 - median]]
-                    ),
+                    yerr=np.array([[median - q25], [q75 - median]]),
                     fmt="o",
                     markersize=np.sqrt(MEDIAN_MARKER_SIZE),
                     color=k_colours[k],
@@ -477,24 +447,18 @@ def plot_summary_panel(
     ax.set_xlim(min(positions) - 0.50, max(positions) + 0.50)
 
     ax.set_ylabel(ylabel)
-    ax.set_title(title, loc="left",pad=5)
+    ax.set_title(title, loc="left", pad=5)
     ax.grid(axis="y", linewidth=0.6, alpha=0.28, zorder=0)
 
 
 def set_ldes_axis(ax: plt.Axes, summary: pd.DataFrame) -> None:
-    panel = summary.loc[
-        summary["metric"].eq("ldes_capacity_error_pct")
-    ]
+    panel = summary.loc[summary["metric"].eq("ldes_capacity_error_pct")]
 
     ymin = min(0.0, float(panel["q25"].min()))
     ymax = max(0.0, float(panel["q75"].max()))
 
-    rounded_min = LDES_TICK_INTERVAL * np.floor(
-        ymin / LDES_TICK_INTERVAL
-    )
-    rounded_max = LDES_TICK_INTERVAL * np.ceil(
-        ymax / LDES_TICK_INTERVAL
-    )
+    rounded_min = LDES_TICK_INTERVAL * np.floor(ymin / LDES_TICK_INTERVAL)
+    rounded_max = LDES_TICK_INTERVAL * np.ceil(ymax / LDES_TICK_INTERVAL)
 
     pad = max(
         0.6,
@@ -514,9 +478,7 @@ def set_ldes_axis(ax: plt.Axes, summary: pd.DataFrame) -> None:
 
 
 def set_runtime_axis(ax: plt.Axes, summary: pd.DataFrame) -> None:
-    panel = summary.loc[
-        summary["metric"].eq("tsa_runtime_seconds")
-    ]
+    panel = summary.loc[summary["metric"].eq("tsa_runtime_seconds")]
 
     ymax = float(panel["q75"].max())
     pad = max(0.4, 0.05 * ymax)
@@ -539,8 +501,7 @@ def make_figure(
     k_offsets = build_k_offsets(k_values)
 
     method_positions = {
-        method: float(index)
-        for index, method in enumerate(METHOD_ORDER)
+        method: float(index) for index, method in enumerate(METHOD_ORDER)
     }
 
     rc = {

@@ -31,7 +31,7 @@ from matplotlib.ticker import MultipleLocator
 # Figure-specific configuration
 # ---------------------------------------------------------------------------
 
-METRIC_NAME = 'macme_capex_weighted_annualised'
+METRIC_NAME = "macme_capex_weighted_annualised"
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
 DEFAULT_OUTPUT_DIR = Path("results/figures/fig_weighted_MACME_results")
@@ -70,8 +70,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SOURCE_DIR,
         help=(
-            "Directory containing parameters.parquet and "
-            "investment_metrics.parquet."
+            "Directory containing parameters.parquet and investment_metrics.parquet."
         ),
     )
     parser.add_argument(
@@ -132,9 +131,8 @@ def filter_ten_year_runs(parameters: pd.DataFrame) -> pd.DataFrame:
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     horizon_years = (
-        (parameters["end_date"] - parameters["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
     parameters["horizon_years"] = horizon_years
 
     mask = np.isclose(
@@ -181,22 +179,15 @@ def load_results(source_dir: Path) -> pd.DataFrame:
         table_name="parameters.parquet",
     )
 
-    method_mask = (
-        parameters["cluster_method"]
-        .astype(str)
-        .str.lower()
-        .eq(CLUSTER_METHOD)
-        & parameters["representation_method"]
-        .astype(str)
-        .str.lower()
-        .eq(REPRESENTATION_METHOD)
+    method_mask = parameters["cluster_method"].astype(str).str.lower().eq(
+        CLUSTER_METHOD
+    ) & parameters["representation_method"].astype(str).str.lower().eq(
+        REPRESENTATION_METHOD
     )
     parameters = parameters.loc[method_mask].copy()
 
     if parameters.empty:
-        raise ValueError(
-            "No k-means + medoid cases were found in parameters.parquet."
-        )
+        raise ValueError("No k-means + medoid cases were found in parameters.parquet.")
 
     parameters = filter_ten_year_runs(parameters)
 
@@ -225,13 +216,10 @@ def load_results(source_dir: Path) -> pd.DataFrame:
         )
         raise ValueError(
             "Expected one value per case, but "
-            "duplicates were found for:\n"
-            + "\n".join(duplicate_ids[:30])
+            "duplicates were found for:\n" + "\n".join(duplicate_ids[:30])
         )
 
-    investment = investment.rename(
-        columns={"value": METRIC_NAME}
-    )
+    investment = investment.rename(columns={"value": METRIC_NAME})
 
     data = parameters.merge(
         investment,
@@ -240,9 +228,7 @@ def load_results(source_dir: Path) -> pd.DataFrame:
         validate="one_to_one",
     )
 
-    data["capex_weighted_macme_pct"] = (
-        100.0 * data[METRIC_NAME]
-    )
+    data["capex_weighted_macme_pct"] = 100.0 * data[METRIC_NAME]
 
     missing = data["capex_weighted_macme_pct"].isna()
     if missing.any():
@@ -273,9 +259,7 @@ def validate_plot_inputs(data: pd.DataFrame) -> None:
     print(f"k:              {ks}")
     print(f"W_P:            {weights}")
 
-    outside_range = [
-        weight for weight in weights if weight < 0.0 or weight > 1.0
-    ]
+    outside_range = [weight for weight in weights if weight < 0.0 or weight > 1.0]
     if outside_range:
         raise ValueError(
             "Proxy weights must lie within [0, 1] for the fixed plasma "
@@ -387,18 +371,14 @@ def make_figure(
             constrained_layout=True,
         )
 
-        k_positions = {
-            k: float(index) for index, k in enumerate(k_values)
-        }
+        k_positions = {k: float(index) for index, k in enumerate(k_values)}
 
         for k in k_values:
             k_data = data.loc[data["k_periods"].eq(k)]
             k_x = k_positions[k]
 
             for wp in wp_values:
-                wp_data = k_data.loc[
-                    np.isclose(k_data["lambda_soc"], wp)
-                ].copy()
+                wp_data = k_data.loc[np.isclose(k_data["lambda_soc"], wp)].copy()
 
                 if wp_data.empty:
                     continue
@@ -419,9 +399,7 @@ def make_figure(
                     ],
                     dtype=float,
                 )
-                ys = wp_data["capex_weighted_macme_pct"].to_numpy(
-                    dtype=float
-                )
+                ys = wp_data["capex_weighted_macme_pct"].to_numpy(dtype=float)
 
                 ax.scatter(
                     xs,
@@ -491,7 +469,6 @@ def make_figure(
         #     zorder=0,
         # )
 
-
         ax.set_xticks(positions)
         ax.set_xticklabels([str(k) for k in k_values])
         ax.set_xlim(
@@ -510,7 +487,6 @@ def make_figure(
             alpha=0.3,
             zorder=0,
         )
-
 
         legend_handles = [
             Line2D(

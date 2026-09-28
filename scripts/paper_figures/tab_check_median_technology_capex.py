@@ -84,9 +84,8 @@ def select_cases(parameters: pd.DataFrame) -> pd.DataFrame:
     data["lambda_soc"] = data["lambda_soc"].astype(float)
 
     data["horizon_years"] = (
-        (data["end_date"] - data["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        data["end_date"] - data["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     selected = data.loc[
         np.isclose(
@@ -140,9 +139,7 @@ def load_capex(
     ].copy()
 
     if capex.empty:
-        raise ValueError(
-            "No CAPEX rows in costs.parquet match the selected case_ids."
-        )
+        raise ValueError("No CAPEX rows in costs.parquet match the selected case_ids.")
 
     capex["value"] = pd.to_numeric(capex["value"], errors="raise")
 
@@ -185,16 +182,13 @@ def load_capex(
         if column in capex.columns:
             group_cols.append(column)
 
-    per_case_tech = (
-        capex.groupby(
-            group_cols,
-            as_index=False,
-            dropna=False,
-        )
-        .agg(
-            annualised_capex=("value", "sum"),
-            n_nodes=("node", "nunique"),
-        )
+    per_case_tech = capex.groupby(
+        group_cols,
+        as_index=False,
+        dropna=False,
+    ).agg(
+        annualised_capex=("value", "sum"),
+        n_nodes=("node", "nunique"),
     )
 
     return per_case_tech
@@ -217,23 +211,21 @@ def add_h2_pathway_total(per_case_tech: pd.DataFrame) -> pd.DataFrame:
     id_cols = [
         column
         for column in per_case_tech.columns
-        if column not in {
+        if column
+        not in {
             "tech",
             "annualised_capex",
             "n_nodes",
         }
     ]
 
-    combined = (
-        pathway.groupby(
-            id_cols,
-            as_index=False,
-            dropna=False,
-        )
-        .agg(
-            annualised_capex=("annualised_capex", "sum"),
-            n_nodes=("n_nodes", "sum"),
-        )
+    combined = pathway.groupby(
+        id_cols,
+        as_index=False,
+        dropna=False,
+    ).agg(
+        annualised_capex=("annualised_capex", "sum"),
+        n_nodes=("n_nodes", "sum"),
     )
 
     combined["tech"] = "H2_storage_pathway_total"
@@ -278,20 +270,15 @@ def calculate_capex_shares(
     conflating the complete hydrogen-storage pathway with the storage
     technology itself.
     """
-    totals = (
-        per_case_tech.groupby(
-            ["case_id", "model_type"],
-            as_index=False,
-        )
-        .agg(
-            total_annualised_capex=("annualised_capex", "sum"),
-        )
+    totals = per_case_tech.groupby(
+        ["case_id", "model_type"],
+        as_index=False,
+    ).agg(
+        total_annualised_capex=("annualised_capex", "sum"),
     )
 
     storage = (
-        per_case_tech.loc[
-            per_case_tech["tech"].eq(LDES_STORAGE_TECH)
-        ]
+        per_case_tech.loc[per_case_tech["tech"].eq(LDES_STORAGE_TECH)]
         .groupby(
             ["case_id", "model_type"],
             as_index=False,
@@ -302,9 +289,7 @@ def calculate_capex_shares(
     )
 
     pathway = (
-        per_case_tech.loc[
-            per_case_tech["tech"].isin(H2_STORAGE_PATHWAY_TECHS)
-        ]
+        per_case_tech.loc[per_case_tech["tech"].isin(H2_STORAGE_PATHWAY_TECHS)]
         .groupby(
             ["case_id", "model_type"],
             as_index=False,
@@ -314,28 +299,24 @@ def calculate_capex_shares(
         )
     )
 
-    shares = (
-        totals
-        .merge(
-            storage,
-            on=["case_id", "model_type"],
-            how="left",
-            validate="one_to_one",
-        )
-        .merge(
-            pathway,
-            on=["case_id", "model_type"],
-            how="left",
-            validate="one_to_one",
-        )
+    shares = totals.merge(
+        storage,
+        on=["case_id", "model_type"],
+        how="left",
+        validate="one_to_one",
+    ).merge(
+        pathway,
+        on=["case_id", "model_type"],
+        how="left",
+        validate="one_to_one",
     )
 
-    shares["ldes_storage_annualised_capex"] = (
-        shares["ldes_storage_annualised_capex"].fillna(0.0)
-    )
-    shares["h2_pathway_annualised_capex"] = (
-        shares["h2_pathway_annualised_capex"].fillna(0.0)
-    )
+    shares["ldes_storage_annualised_capex"] = shares[
+        "ldes_storage_annualised_capex"
+    ].fillna(0.0)
+    shares["h2_pathway_annualised_capex"] = shares[
+        "h2_pathway_annualised_capex"
+    ].fillna(0.0)
 
     shares["ldes_storage_capex_share_pct"] = (
         100.0
@@ -344,9 +325,7 @@ def calculate_capex_shares(
     )
 
     shares["h2_pathway_capex_share_pct"] = (
-        100.0
-        * shares["h2_pathway_annualised_capex"]
-        / shares["total_annualised_capex"]
+        100.0 * shares["h2_pathway_annualised_capex"] / shares["total_annualised_capex"]
     )
 
     summary = (
@@ -386,21 +365,15 @@ def calculate_capex_shares(
 
 
 def main() -> None:
-    parameters = pd.read_parquet(
-        RESULTS_DIR / "parameters.parquet"
-    )
-    costs = pd.read_parquet(
-        RESULTS_DIR / "costs.parquet"
-    )
+    parameters = pd.read_parquet(RESULTS_DIR / "parameters.parquet")
+    costs = pd.read_parquet(RESULTS_DIR / "costs.parquet")
 
     selected = select_cases(parameters)
     per_case_tech = load_capex(costs, selected)
 
     # Calculate shares before adding the synthetic pathway-total row,
     # otherwise the pathway components would be counted twice in total CAPEX.
-    capex_shares, capex_share_summary = calculate_capex_shares(
-        per_case_tech
-    )
+    capex_shares, capex_share_summary = calculate_capex_shares(per_case_tech)
 
     per_case_tech_with_pathway = add_h2_pathway_total(per_case_tech)
     summary = summarise(per_case_tech_with_pathway)
@@ -411,10 +384,7 @@ def main() -> None:
     print(f"Countries: {sorted(selected['country'].astype(str).unique())}")
 
     if "k_periods" in selected.columns:
-        print(
-            "k values:  "
-            f"{sorted(selected['k_periods'].astype(int).unique())}"
-        )
+        print(f"k values:  {sorted(selected['k_periods'].astype(int).unique())}")
 
     print(f"W_P:       {TARGET_WP:g}")
     print("Horizon:   ~10 years")
@@ -450,10 +420,7 @@ def main() -> None:
     )
 
     reference_share = capex_share_summary.loc[
-        capex_share_summary["model_type"]
-        .astype(str)
-        .str.lower()
-        .eq("reference")
+        capex_share_summary["model_type"].astype(str).str.lower().eq("reference")
     ]
 
     if not reference_share.empty:

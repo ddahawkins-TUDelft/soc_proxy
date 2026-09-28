@@ -63,9 +63,7 @@ from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 # ---------------------------------------------------------------------------
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
-DEFAULT_OUTPUT_DIR = Path(
-    "results/figures/OLD_fig_accuracy_runtime_tradeoff"
-)
+DEFAULT_OUTPUT_DIR = Path("results/figures/OLD_fig_accuracy_runtime_tradeoff")
 OUTPUT_STEM = "OLD_fig_accuracy_runtime_tradeoff"
 
 DEFAULT_WIDTH_PX = 2000
@@ -111,8 +109,7 @@ MACME_METRIC = "macme_capex_weighted_annualised"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Plot accuracy-runtime trade-offs for W_P=0.5 "
-            "k-means + medoid cases."
+            "Plot accuracy-runtime trade-offs for W_P=0.5 k-means + medoid cases."
         )
     )
     parser.add_argument(
@@ -120,8 +117,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SOURCE_DIR,
         help=(
-            "Directory containing parameters.parquet and "
-            "investment_metrics.parquet."
+            "Directory containing parameters.parquet and investment_metrics.parquet."
         ),
     )
     parser.add_argument(
@@ -156,10 +152,7 @@ def parse_args() -> argparse.Namespace:
         "--wp",
         type=float,
         default=TARGET_PROXY_WEIGHT,
-        help=(
-            "SoC proxy weight to plot "
-            f"(default: {TARGET_PROXY_WEIGHT:g})."
-        ),
+        help=(f"SoC proxy weight to plot (default: {TARGET_PROXY_WEIGHT:g})."),
     )
     parser.add_argument(
         "--width-px",
@@ -217,9 +210,7 @@ def resolve_column(
             return candidate
 
     runtime_columns = sorted(
-        column
-        for column in frame.columns
-        if "runtime" in column.lower()
+        column for column in frame.columns if "runtime" in column.lower()
     )
     raise ValueError(
         f"Could not find the {purpose} column. "
@@ -240,17 +231,13 @@ def assign_horizon_duration(
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     parameters["horizon_years_exact"] = (
-        (parameters["end_date"] - parameters["start_date"])
-        .dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     targets = np.asarray(horizons, dtype=float)
     exact = parameters["horizon_years_exact"].to_numpy(dtype=float)
 
-    nearest_index = np.abs(
-        exact[:, None] - targets[None, :]
-    ).argmin(axis=1)
+    nearest_index = np.abs(exact[:, None] - targets[None, :]).argmin(axis=1)
     nearest_target = targets[nearest_index]
     nearest_distance = np.abs(exact - nearest_target)
 
@@ -315,15 +302,10 @@ def load_results(
     parameters["k_periods"] = parameters["k_periods"].astype(int)
     parameters["lambda_soc"] = parameters["lambda_soc"].astype(float)
 
-    method_mask = (
-        parameters["cluster_method"]
-        .astype(str)
-        .str.lower()
-        .eq(CLUSTER_METHOD)
-        & parameters["representation_method"]
-        .astype(str)
-        .str.lower()
-        .eq(REPRESENTATION_METHOD)
+    method_mask = parameters["cluster_method"].astype(str).str.lower().eq(
+        CLUSTER_METHOD
+    ) & parameters["representation_method"].astype(str).str.lower().eq(
+        REPRESENTATION_METHOD
     )
 
     k_values = sorted(set(int(k) for k in k_values))
@@ -331,9 +313,7 @@ def load_results(
         raise ValueError("At least one k value must be supplied.")
 
     horizons = [
-        horizon
-        for horizon in HORIZON_ORDER
-        if horizon in set(int(h) for h in horizons)
+        horizon for horizon in HORIZON_ORDER if horizon in set(int(h) for h in horizons)
     ]
     if not horizons:
         raise ValueError("At least one modelling horizon must be supplied.")
@@ -364,9 +344,7 @@ def load_results(
 
     missing_runtime = parameters[runtime_columns].isna().any(axis=1)
     if missing_runtime.any():
-        missing_ids = parameters.loc[
-            missing_runtime, "case_id"
-        ].tolist()
+        missing_ids = parameters.loc[missing_runtime, "case_id"].tolist()
         raise ValueError(
             "Missing runtime values for selected cases. First cases:\n"
             + "\n".join(missing_ids[:20])
@@ -393,9 +371,7 @@ def load_results(
 
     investment = investment.loc[
         investment["case_id"].isin(case_ids)
-        & investment["metric"].isin(
-            {LDES_METRIC, MACME_METRIC}
-        ),
+        & investment["metric"].isin({LDES_METRIC, MACME_METRIC}),
         ["case_id", "metric", "value"],
     ].copy()
 
@@ -411,8 +387,7 @@ def load_results(
 
         raise ValueError(
             "investment_metrics.parquet contains duplicate "
-            "(case_id, metric) rows:\n"
-            + duplicate_rows.head(30).to_string(index=False)
+            "(case_id, metric) rows:\n" + duplicate_rows.head(30).to_string(index=False)
         )
 
     investment = investment.pivot(
@@ -435,39 +410,22 @@ def load_results(
         validate="one_to_one",
     )
 
-    missing_metrics = data[
-        [LDES_METRIC, MACME_METRIC]
-    ].isna().any(axis=1)
+    missing_metrics = data[[LDES_METRIC, MACME_METRIC]].isna().any(axis=1)
 
     if missing_metrics.any():
-        missing_ids = data.loc[
-            missing_metrics, "case_id"
-        ].tolist()
+        missing_ids = data.loc[missing_metrics, "case_id"].tolist()
         raise ValueError(
             "Missing required error metrics for selected cases. "
-            "First cases:\n"
-            + "\n".join(missing_ids[:20])
+            "First cases:\n" + "\n".join(missing_ids[:20])
         )
 
-    data["ldes_abs_error_pct"] = (
-        100.0 * data[LDES_METRIC].abs()
-    )
-    data["capex_weighted_macme_pct"] = (
-        100.0 * data[MACME_METRIC]
-    )
-    data["speedup"] = (
-        data[REFERENCE_RUNTIME_COLUMN]
-        / data["runtime_method_seconds"]
-    )
+    data["ldes_abs_error_pct"] = 100.0 * data[LDES_METRIC].abs()
+    data["capex_weighted_macme_pct"] = 100.0 * data[MACME_METRIC]
+    data["speedup"] = data[REFERENCE_RUNTIME_COLUMN] / data["runtime_method_seconds"]
 
-    invalid_speedup = (
-        ~np.isfinite(data["speedup"])
-        | data["speedup"].le(0)
-    )
+    invalid_speedup = ~np.isfinite(data["speedup"]) | data["speedup"].le(0)
     if invalid_speedup.any():
-        raise ValueError(
-            "Calculated speedup contains invalid or non-positive values."
-        )
+        raise ValueError("Calculated speedup contains invalid or non-positive values.")
 
     return data, total_runtime_column
 
@@ -506,11 +464,7 @@ def pareto_front(
             keep.append(row.Index)
             best_speedup = speedup
 
-    return (
-        candidates.loc[keep]
-        .sort_values(error_column)
-        .reset_index(drop=True)
-    )
+    return candidates.loc[keep].sort_values(error_column).reset_index(drop=True)
 
 
 def build_k_colours(
@@ -520,10 +474,7 @@ def build_k_colours(
     cmap = plt.get_cmap("plasma")
 
     if len(k_values) == 1:
-        return {
-            k_values[0]:
-            cmap((PLASMA_MIN + PLASMA_MAX) / 2)
-        }
+        return {k_values[0]: cmap((PLASMA_MIN + PLASMA_MAX) / 2)}
 
     positions = np.linspace(
         PLASMA_MIN,
@@ -563,14 +514,10 @@ def add_tradeoff_panel(
     k_values = sorted(k_colours)
 
     for horizon in horizons:
-        horizon_data = data.loc[
-            data["horizon_duration"].eq(horizon)
-        ]
+        horizon_data = data.loc[data["horizon_duration"].eq(horizon)]
 
         for k in k_values:
-            subset = horizon_data.loc[
-                horizon_data["k_periods"].eq(k)
-            ]
+            subset = horizon_data.loc[horizon_data["k_periods"].eq(k)]
 
             if subset.empty:
                 continue
@@ -617,16 +564,10 @@ def add_tradeoff_panel(
     ax.set_ylabel(r"Speedup ($\times$)")
     ax.set_xlabel(xlabel)
 
-    ax.xaxis.set_major_formatter(
-        FuncFormatter(percentage_formatter)
-    )
+    ax.xaxis.set_major_formatter(FuncFormatter(percentage_formatter))
 
-    ax.yaxis.set_major_locator(
-        LogLocator(base=10)
-    )
-    ax.yaxis.set_minor_formatter(
-        NullFormatter()
-    )
+    ax.yaxis.set_major_locator(LogLocator(base=10))
+    ax.yaxis.set_minor_formatter(NullFormatter())
 
     # Only major-order horizontal grid lines, matching the runtime figure.
     ax.grid(
@@ -659,18 +600,9 @@ def validate_plot_inputs(
     runtime_source_column: str,
 ) -> None:
     """Print selected dimensions and basic speedup diagnostics."""
-    countries = sorted(
-        str(x)
-        for x in data["country"].dropna().unique()
-    )
-    horizons = sorted(
-        int(x)
-        for x in data["horizon_duration"].unique()
-    )
-    ks = sorted(
-        int(x)
-        for x in data["k_periods"].unique()
-    )
+    countries = sorted(str(x) for x in data["country"].dropna().unique())
+    horizons = sorted(int(x) for x in data["horizon_duration"].unique())
+    ks = sorted(int(x) for x in data["k_periods"].unique())
 
     print("Figure 8 — Accuracy-runtime trade-off")
     print("=====================================")
@@ -681,9 +613,7 @@ def validate_plot_inputs(
     print(f"W_P:             {proxy_weight:g}")
     print(f"Runtime column:  {runtime_source_column}")
     print(
-        "Speedup range:   "
-        f"{data['speedup'].min():.2f}x to "
-        f"{data['speedup'].max():.2f}x"
+        f"Speedup range:   {data['speedup'].min():.2f}x to {data['speedup'].max():.2f}x"
     )
 
 
@@ -697,19 +627,14 @@ def make_figure(
 ) -> tuple[plt.Figure, pd.DataFrame, pd.DataFrame]:
     """Build the two-panel Figure 8 trade-off plot."""
     if width_px <= 0 or height_px <= 0 or dpi <= 0:
-        raise ValueError(
-            "width-px, height-px, and dpi must all be positive."
-        )
+        raise ValueError("width-px, height-px, and dpi must all be positive.")
 
     figsize = (
         width_px / dpi,
         height_px / dpi,
     )
 
-    k_values = sorted(
-        int(x)
-        for x in data["k_periods"].unique()
-    )
+    k_values = sorted(int(x) for x in data["k_periods"].unique())
     k_colours = build_k_colours(k_values)
 
     rc = {
@@ -819,7 +744,6 @@ def make_figure(
         )
         fig.add_artist(legend_k)
 
-
         fig.subplots_adjust(
             left=0.13,
             right=0.9,
@@ -846,21 +770,11 @@ def save_outputs(
         exist_ok=True,
     )
 
-    png_path = (
-        output_dir / f"{OUTPUT_STEM}.png"
-    )
-    pdf_path = (
-        output_dir / f"{OUTPUT_STEM}.pdf"
-    )
-    points_path = (
-        output_dir / f"{OUTPUT_STEM}_points.csv"
-    )
-    pareto_ldes_path = (
-        output_dir / f"{OUTPUT_STEM}_pareto_ldes.csv"
-    )
-    pareto_macme_path = (
-        output_dir / f"{OUTPUT_STEM}_pareto_macme.csv"
-    )
+    png_path = output_dir / f"{OUTPUT_STEM}.png"
+    pdf_path = output_dir / f"{OUTPUT_STEM}.pdf"
+    points_path = output_dir / f"{OUTPUT_STEM}_points.csv"
+    pareto_ldes_path = output_dir / f"{OUTPUT_STEM}_pareto_ldes.csv"
+    pareto_macme_path = output_dir / f"{OUTPUT_STEM}_pareto_macme.csv"
 
     fig.savefig(
         png_path,
@@ -914,11 +828,7 @@ def save_outputs(
 def main() -> None:
     args = parse_args()
 
-    horizons = [
-        horizon
-        for horizon in HORIZON_ORDER
-        if horizon in set(args.horizons)
-    ]
+    horizons = [horizon for horizon in HORIZON_ORDER if horizon in set(args.horizons)]
 
     data, runtime_source_column = load_results(
         args.source_dir,
@@ -952,12 +862,8 @@ def main() -> None:
 
     print("\nPareto points")
     print("-------------")
-    print(
-        f"LDES capacity: {len(pareto_ldes)} / {len(data)} cases"
-    )
-    print(
-        f"CAPEX-weighted MACME: {len(pareto_macme)} / {len(data)} cases"
-    )
+    print(f"LDES capacity: {len(pareto_ldes)} / {len(data)} cases")
+    print(f"CAPEX-weighted MACME: {len(pareto_macme)} / {len(data)} cases")
 
     print("\nSaved:")
     for output in outputs:

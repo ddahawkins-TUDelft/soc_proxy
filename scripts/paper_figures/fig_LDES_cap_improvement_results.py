@@ -64,7 +64,7 @@ DEFAULT_HEIGHT_PX = 1200
 DEFAULT_DPI = 300
 
 TARGET_HORIZON_YEARS = 10.0
-HORIZON_TOLERANCE_YEARS = .1
+HORIZON_TOLERANCE_YEARS = 0.1
 
 TARGET_PROXY_WEIGHT = 0.5
 BASELINE_PROXY_WEIGHT = 0.0
@@ -113,8 +113,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SOURCE_DIR,
         help=(
-            "Directory containing parameters.parquet and "
-            "investment_metrics.parquet."
+            "Directory containing parameters.parquet and investment_metrics.parquet."
         ),
     )
     parser.add_argument(
@@ -175,9 +174,8 @@ def filter_ten_year_runs(parameters: pd.DataFrame) -> pd.DataFrame:
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     parameters["horizon_years"] = (
-        (parameters["end_date"] - parameters["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     mask = np.isclose(
         parameters["horizon_years"],
@@ -211,12 +209,7 @@ def infer_representation_scope(parameters: pd.DataFrame) -> pd.Series:
     """
     for column in ("representation_scope", "scope"):
         if column in parameters.columns:
-            return (
-                parameters[column]
-                .astype("string")
-                .str.lower()
-                .fillna("")
-            )
+            return parameters[column].astype("string").str.lower().fillna("")
 
     names = parameters["experiment_name"].astype("string").str.lower().fillna("")
 
@@ -234,13 +227,11 @@ def assign_method_key(parameters: pd.DataFrame) -> pd.Series:
 
     method_key = pd.Series(pd.NA, index=parameters.index, dtype="string")
 
-    method_key.loc[
-        cluster.eq("hierarchical") & representation.eq("medoid")
-    ] = "hierarchical_medoid"
+    method_key.loc[cluster.eq("hierarchical") & representation.eq("medoid")] = (
+        "hierarchical_medoid"
+    )
 
-    method_key.loc[
-        cluster.eq("kmeans") & representation.eq("medoid")
-    ] = "kmeans_medoid"
+    method_key.loc[cluster.eq("kmeans") & representation.eq("medoid")] = "kmeans_medoid"
 
     method_key.loc[
         cluster.eq("hierarchical")
@@ -322,7 +313,8 @@ def load_results(source_dir: Path) -> pd.DataFrame:
     ].copy()
 
     missing_methods = [
-        method for method in METHOD_ORDER
+        method
+        for method in METHOD_ORDER
         if method not in set(selected["method_key"].dropna())
     ]
     if missing_methods:
@@ -340,9 +332,7 @@ def load_results(source_dir: Path) -> pd.DataFrame:
         method_data = selected.loc[selected["method_key"].eq(method)]
 
         for weight in (BASELINE_PROXY_WEIGHT, TARGET_PROXY_WEIGHT):
-            weight_data = method_data.loc[
-                np.isclose(method_data["lambda_soc"], weight)
-            ]
+            weight_data = method_data.loc[np.isclose(method_data["lambda_soc"], weight)]
             available_k = set(weight_data["k_periods"].unique())
             missing_k = sorted(set(COMMON_K_VALUES) - available_k)
 
@@ -354,8 +344,7 @@ def load_results(source_dir: Path) -> pd.DataFrame:
     if validation_rows:
         raise ValueError(
             "Not all selected methods contain the common k set for both "
-            "W_P=0 and W_P=0.5:\n"
-            + "\n".join(validation_rows)
+            "W_P=0 and W_P=0.5:\n" + "\n".join(validation_rows)
         )
 
     case_ids = set(selected["case_id"])
@@ -369,25 +358,19 @@ def load_results(source_dir: Path) -> pd.DataFrame:
 
     investment["case_id"] = investment["case_id"].astype(str)
     investment = investment.loc[
-        investment["case_id"].isin(case_ids)
-        & investment["metric"].eq(METRIC_NAME),
+        investment["case_id"].isin(case_ids) & investment["metric"].eq(METRIC_NAME),
         ["case_id", "value"],
     ].copy()
 
     duplicated = investment["case_id"].duplicated(keep=False)
     if duplicated.any():
-        duplicate_ids = sorted(
-            investment.loc[duplicated, "case_id"].unique()
-        )
+        duplicate_ids = sorted(investment.loc[duplicated, "case_id"].unique())
         raise ValueError(
             f"Expected one {METRIC_NAME} value per case, but duplicates "
-            "were found for:\n"
-            + "\n".join(duplicate_ids[:30])
+            "were found for:\n" + "\n".join(duplicate_ids[:30])
         )
 
-    investment = investment.rename(
-        columns={"value": "ldes_capacity_error_signed"}
-    )
+    investment = investment.rename(columns={"value": "ldes_capacity_error_signed"})
 
     data = selected.merge(
         investment,
@@ -396,9 +379,7 @@ def load_results(source_dir: Path) -> pd.DataFrame:
         validate="one_to_one",
     )
 
-    data["ldes_capacity_error_pct"] = (
-        100.0 * data["ldes_capacity_error_signed"]
-    )
+    data["ldes_capacity_error_pct"] = 100.0 * data["ldes_capacity_error_signed"]
 
     missing_metric = data["ldes_capacity_error_pct"].isna()
     if missing_metric.any():
@@ -437,15 +418,10 @@ def load_results(source_dir: Path) -> pd.DataFrame:
         )
 
     baseline = baseline.rename(
-        columns={
-            "ldes_capacity_error_pct":
-                "ldes_capacity_error_original_pct"
-        }
+        columns={"ldes_capacity_error_pct": "ldes_capacity_error_original_pct"}
     )
 
-    proxy = data.loc[
-        np.isclose(data["lambda_soc"], TARGET_PROXY_WEIGHT)
-    ].copy()
+    proxy = data.loc[np.isclose(data["lambda_soc"], TARGET_PROXY_WEIGHT)].copy()
 
     duplicate_proxy = proxy.duplicated(pair_columns, keep=False)
     if duplicate_proxy.any():
@@ -469,9 +445,7 @@ def load_results(source_dir: Path) -> pd.DataFrame:
     if missing_baseline.any():
         raise ValueError(
             "Some W_P=0.5 cases do not have a matching W_P=0 baseline:\n"
-            + proxy.loc[missing_baseline, pair_columns]
-            .head(30)
-            .to_string(index=False)
+            + proxy.loc[missing_baseline, pair_columns].head(30).to_string(index=False)
         )
 
     # Positive = W_P=0.5 is closer to zero than original TSA.
@@ -512,9 +486,7 @@ def calculate_summary(data: pd.DataFrame) -> pd.DataFrame:
                 "n_improved": n_improved,
                 "n_worsened": n_worsened,
                 "n_unchanged": n_unchanged,
-                "proportion_improved": (
-                    n_improved / n_total if n_total else np.nan
-                ),
+                "proportion_improved": (n_improved / n_total if n_total else np.nan),
                 "median_improvement_pp": values.median(),
                 "mean_improvement_pp": values.mean(),
             }
@@ -531,14 +503,10 @@ def calculate_summary(data: pd.DataFrame) -> pd.DataFrame:
     by_method = pd.DataFrame(method_rows)
 
     # Preserve the visual method order.
-    method_order = {
-        method: index for index, method in enumerate(METHOD_ORDER)
-    }
+    method_order = {method: index for index, method in enumerate(METHOD_ORDER)}
     by_method["_order"] = by_method["method_key"].map(method_order)
     by_method = (
-        by_method.sort_values("_order")
-        .drop(columns="_order")
-        .reset_index(drop=True)
+        by_method.sort_values("_order").drop(columns="_order").reset_index(drop=True)
     )
 
     overall_values = data["ldes_abs_error_improvement_pp"]
@@ -555,9 +523,7 @@ def calculate_summary(data: pd.DataFrame) -> pd.DataFrame:
                 "n_improved": n_improved,
                 "n_worsened": n_worsened,
                 "n_unchanged": n_total - n_improved - n_worsened,
-                "proportion_improved": (
-                    n_improved / n_total if n_total else np.nan
-                ),
+                "proportion_improved": (n_improved / n_total if n_total else np.nan),
                 "median_improvement_pp": overall_values.median(),
                 "mean_improvement_pp": overall_values.mean(),
             }
@@ -571,8 +537,7 @@ def print_summary(data: pd.DataFrame, summary: pd.DataFrame) -> None:
     """Print selected dimensions and improvement statistics."""
     countries = sorted(str(x) for x in data["country"].dropna().unique())
     horizons = sorted(
-        round(float(x), 3)
-        for x in data["horizon_years"].dropna().unique()
+        round(float(x), 3) for x in data["horizon_years"].dropna().unique()
     )
     ks = sorted(int(x) for x in data["k_periods"].dropna().unique())
 
@@ -601,10 +566,7 @@ def print_summary(data: pd.DataFrame, summary: pd.DataFrame) -> None:
 def proxy_colour() -> object:
     """Return the fixed plasma colour corresponding to W_P=0.5."""
     cmap = plt.get_cmap("plasma")
-    position = (
-        PLASMA_MIN
-        + TARGET_PROXY_WEIGHT * (PLASMA_MAX - PLASMA_MIN)
-    )
+    position = PLASMA_MIN + TARGET_PROXY_WEIGHT * (PLASMA_MAX - PLASMA_MIN)
     return cmap(position)
 
 
@@ -642,8 +604,7 @@ def make_figure(
         )
 
         method_positions = {
-            method: float(index)
-            for index, method in enumerate(METHOD_ORDER)
+            method: float(index) for index, method in enumerate(METHOD_ORDER)
         }
 
         rng = np.random.default_rng(JITTER_SEED)
@@ -661,9 +622,7 @@ def make_figure(
         )
 
         for method in METHOD_ORDER:
-            method_data = plot_data.loc[
-                plot_data["method_key"].eq(method)
-            ]
+            method_data = plot_data.loc[plot_data["method_key"].eq(method)]
             centre = method_positions[method]
 
             jitter = rng.uniform(
@@ -672,9 +631,7 @@ def make_figure(
                 size=len(method_data),
             )
             xs = centre + jitter
-            ys = method_data["ldes_abs_error_improvement_pp"].to_numpy(
-                dtype=float
-            )
+            ys = method_data["ldes_abs_error_improvement_pp"].to_numpy(dtype=float)
 
             ax.scatter(
                 xs,
@@ -714,19 +671,14 @@ def make_figure(
 
         positions = [method_positions[method] for method in METHOD_ORDER]
         ax.set_xticks(positions)
-        ax.set_xticklabels(
-            [METHOD_LABELS[method] for method in METHOD_ORDER]
-        )
+        ax.set_xticklabels([METHOD_LABELS[method] for method in METHOD_ORDER])
         ax.set_xlim(
             min(positions) - 0.45,
             max(positions) + 0.45,
         )
 
         ax.set_xlabel("TSA clustering + representation methods")
-        ax.set_ylabel(
-            "Reduction in absolute LDES capacity error\n"
-            "(percentage points)"
-        )
+        ax.set_ylabel("Reduction in absolute LDES capacity error\n(percentage points)")
 
         # Use the full data range here rather than q95 clipping because this
         # figure is intended to show every improved/worsened case.
@@ -734,14 +686,8 @@ def make_figure(
         ymin = min(0.0, float(np.min(values)))
         ymax = max(0.0, float(np.max(values)))
 
-        ymin = (
-            Y_TICK_INTERVAL_PP
-            * np.floor(ymin / Y_TICK_INTERVAL_PP)
-        )
-        ymax = (
-            Y_TICK_INTERVAL_PP
-            * np.ceil(ymax / Y_TICK_INTERVAL_PP)
-        )
+        ymin = Y_TICK_INTERVAL_PP * np.floor(ymin / Y_TICK_INTERVAL_PP)
+        ymax = Y_TICK_INTERVAL_PP * np.ceil(ymax / Y_TICK_INTERVAL_PP)
 
         # Ensure a non-zero plotting range in the unlikely event that all
         # values fall on zero.

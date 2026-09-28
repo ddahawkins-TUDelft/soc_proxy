@@ -220,9 +220,8 @@ def assign_horizon_duration(parameters: pd.DataFrame) -> pd.DataFrame:
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     parameters["horizon_years_exact"] = (
-        (parameters["end_date"] - parameters["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     targets = np.asarray(HORIZON_ORDER, dtype=float)
     exact = parameters["horizon_years_exact"].to_numpy(dtype=float)
@@ -302,12 +301,10 @@ def load_results(
     parameters["k_periods"] = parameters["k_periods"].astype(int)
     parameters["lambda_soc"] = parameters["lambda_soc"].astype(float)
 
-    method_mask = (
-        parameters["cluster_method"].astype(str).str.lower().eq(CLUSTER_METHOD)
-        & parameters["representation_method"]
-        .astype(str)
-        .str.lower()
-        .eq(REPRESENTATION_METHOD)
+    method_mask = parameters["cluster_method"].astype(str).str.lower().eq(
+        CLUSTER_METHOD
+    ) & parameters["representation_method"].astype(str).str.lower().eq(
+        REPRESENTATION_METHOD
     )
 
     k_values = sorted(set(int(k) for k in k_values))
@@ -381,9 +378,7 @@ def load_results(
     )
 
     if references.empty:
-        raise ValueError(
-            f"No values were found in {REFERENCE_RUNTIME_COLUMN}."
-        )
+        raise ValueError(f"No values were found in {REFERENCE_RUNTIME_COLUMN}.")
 
     if references[REFERENCE_RUNTIME_COLUMN].le(0).any():
         raise ValueError(
@@ -429,9 +424,7 @@ def aggregate_runtime(
         .reset_index(drop=True)
     )
 
-    clustered_summary["runtime_minutes"] = (
-        clustered_summary["runtime_seconds"] / 60.0
-    )
+    clustered_summary["runtime_minutes"] = clustered_summary["runtime_seconds"] / 60.0
     reference_summary["reference_runtime_minutes"] = (
         reference_summary["reference_runtime_seconds"] / 60.0
     )
@@ -529,9 +522,7 @@ def print_summary(
                 f"(n={int(row['n_reference_runs'])})"
             )
 
-    overall = component_summary.loc[
-        component_summary["horizon"].eq("overall")
-    ].iloc[0]
+    overall = component_summary.loc[component_summary["horizon"].eq("overall")].iloc[0]
 
     print("\nRuntime components for paper reporting")
     print("--------------------------------------")
@@ -556,10 +547,7 @@ def build_k_colours(k_values: list[int]) -> dict[int, object]:
         return {k_values[0]: cmap((PLASMA_MIN + PLASMA_MAX) / 2)}
 
     positions = np.linspace(PLASMA_MIN, PLASMA_MAX, len(k_values))
-    return {
-        k: cmap(position)
-        for k, position in zip(k_values, positions, strict=True)
-    }
+    return {k: cmap(position) for k, position in zip(k_values, positions, strict=True)}
 
 
 def make_figure(
@@ -572,9 +560,7 @@ def make_figure(
 ) -> plt.Figure:
     """Build the publication runtime figure."""
     if width_px <= 0 or height_px <= 0 or dpi <= 0:
-        raise ValueError(
-            "width-px, height-px, and dpi must all be positive."
-        )
+        raise ValueError("width-px, height-px, and dpi must all be positive.")
 
     figsize = (width_px / dpi, height_px / dpi)
 
@@ -613,10 +599,7 @@ def make_figure(
             if k_data.empty:
                 continue
 
-            xs = [
-                horizon_positions[int(h)]
-                for h in k_data["horizon_duration"]
-            ]
+            xs = [horizon_positions[int(h)] for h in k_data["horizon_duration"]]
             ys = k_data["runtime_minutes"].to_numpy(dtype=float)
 
             ax.scatter(
@@ -634,12 +617,9 @@ def make_figure(
         # Full-resolution reference points in grey.
         if not reference_summary.empty:
             xs = [
-                horizon_positions[int(h)]
-                for h in reference_summary["horizon_duration"]
+                horizon_positions[int(h)] for h in reference_summary["horizon_duration"]
             ]
-            ys = reference_summary["reference_runtime_minutes"].to_numpy(
-                dtype=float
-            )
+            ys = reference_summary["reference_runtime_minutes"].to_numpy(dtype=float)
 
             ax.scatter(
                 xs,
@@ -653,9 +633,7 @@ def make_figure(
                 label="ref",
             )
 
-        ax.set_xticks(
-            [horizon_positions[h] for h in HORIZON_ORDER]
-        )
+        ax.set_xticks([horizon_positions[h] for h in HORIZON_ORDER])
         ax.set_xticklabels([str(h) for h in HORIZON_ORDER])
         ax.set_xlim(
             min(horizon_positions.values()) - 0.35,
@@ -669,9 +647,7 @@ def make_figure(
         # Show only the major 1, 10, and 100 min markers and grid lines.
         major_ticks = [1.0, 10.0, 100.0]
         ax.yaxis.set_major_locator(FixedLocator(major_ticks))
-        ax.yaxis.set_major_formatter(
-            FixedFormatter(["1.0 min", "10 min", "100 min"])
-        )
+        ax.yaxis.set_major_formatter(FixedFormatter(["1.0 min", "10 min", "100 min"]))
         ax.yaxis.set_minor_formatter(NullFormatter())
 
         # Expand limits slightly while respecting positive log scale.

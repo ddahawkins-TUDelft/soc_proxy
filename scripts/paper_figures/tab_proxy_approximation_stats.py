@@ -54,8 +54,7 @@ DUPLICATE_VALUE_ATOL = 1e-10
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Summarise 10-year reference SoC-proxy approximation metrics "
-            "by country."
+            "Summarise 10-year reference SoC-proxy approximation metrics by country."
         )
     )
     parser.add_argument(
@@ -102,9 +101,8 @@ def load_ten_year_cases(source_dir: Path) -> pd.DataFrame:
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     parameters["horizon_years"] = (
-        (parameters["end_date"] - parameters["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     parameters = parameters.loc[
         np.isclose(
@@ -128,9 +126,8 @@ def load_ten_year_cases(source_dir: Path) -> pd.DataFrame:
 def empty_window_mask(series: pd.Series) -> pd.Series:
     mask = series.isna()
 
-    if (
-        pd.api.types.is_object_dtype(series.dtype)
-        or pd.api.types.is_string_dtype(series.dtype)
+    if pd.api.types.is_object_dtype(series.dtype) or pd.api.types.is_string_dtype(
+        series.dtype
     ):
         mask |= series.astype("string").str.strip().fillna("").eq("")
 
@@ -199,8 +196,7 @@ def load_reference_proxy_metrics(
 
         raise ValueError(
             "Expected one unwindowed reference metric per case_id / metric, "
-            "but duplicates were found:\n"
-            + dup.head(40).to_string(index=False)
+            "but duplicates were found:\n" + dup.head(40).to_string(index=False)
         )
 
     return metrics[["case_id", "metric", "value"]]
@@ -224,13 +220,10 @@ def collapse_to_unique_weather_sets(
 
     key = ["country", "start_date", "end_date", "metric"]
 
-    consistency = (
-        data.groupby(key, as_index=False)
-        .agg(
-            n_case_ids=("case_id", "nunique"),
-            value_min=("value", "min"),
-            value_max=("value", "max"),
-        )
+    consistency = data.groupby(key, as_index=False).agg(
+        n_case_ids=("case_id", "nunique"),
+        value_min=("value", "min"),
+        value_max=("value", "max"),
     )
 
     inconsistent = consistency.loc[
@@ -285,10 +278,7 @@ def format_value(metric: str, value: float) -> str:
 def build_latex_table(summary: pd.DataFrame) -> str:
     countries = list(summary["country"].drop_duplicates())
 
-    lookup = {
-        (row.country, row.metric): row
-        for row in summary.itertuples(index=False)
-    }
+    lookup = {(row.country, row.metric): row for row in summary.itertuples(index=False)}
 
     lines = [
         r"\begin{table}[]",
@@ -328,8 +318,7 @@ def build_latex_table(summary: pd.DataFrame) -> str:
         n_text = f"$n={unique_counts[0]}$ per country"
     else:
         n_text = ", ".join(
-            f"{country}: $n={count}$"
-            for country, count in counts.items()
+            f"{country}: $n={count}$" for country, count in counts.items()
         )
 
     lines.extend(

@@ -98,8 +98,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SOURCE_DIR,
         help=(
-            "Directory containing parameters.parquet and "
-            "investment_metrics.parquet."
+            "Directory containing parameters.parquet and investment_metrics.parquet."
         ),
     )
     parser.add_argument(
@@ -170,9 +169,8 @@ def assign_horizon_duration(parameters: pd.DataFrame) -> pd.DataFrame:
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
 
     parameters["horizon_years_exact"] = (
-        (parameters["end_date"] - parameters["start_date"]).dt.total_seconds()
-        / (365.2425 * 24 * 60 * 60)
-    )
+        parameters["end_date"] - parameters["start_date"]
+    ).dt.total_seconds() / (365.2425 * 24 * 60 * 60)
 
     targets = np.asarray(HORIZON_ORDER, dtype=float)
     exact = parameters["horizon_years_exact"].to_numpy(dtype=float)
@@ -223,22 +221,15 @@ def load_results(
         table_name="parameters.parquet",
     )
 
-    method_mask = (
-        parameters["cluster_method"]
-        .astype(str)
-        .str.lower()
-        .eq(CLUSTER_METHOD)
-        & parameters["representation_method"]
-        .astype(str)
-        .str.lower()
-        .eq(REPRESENTATION_METHOD)
+    method_mask = parameters["cluster_method"].astype(str).str.lower().eq(
+        CLUSTER_METHOD
+    ) & parameters["representation_method"].astype(str).str.lower().eq(
+        REPRESENTATION_METHOD
     )
     parameters = parameters.loc[method_mask].copy()
 
     if parameters.empty:
-        raise ValueError(
-            "No k-means + medoid cases were found in parameters.parquet."
-        )
+        raise ValueError("No k-means + medoid cases were found in parameters.parquet.")
 
     parameters = assign_horizon_duration(parameters)
 
@@ -286,8 +277,7 @@ def load_results(
     if missing_combinations:
         raise ValueError(
             "The selected horizon / W_P channels do not all contain the same "
-            "requested k subset:\n"
-            + "\n".join(missing_combinations)
+            "requested k subset:\n" + "\n".join(missing_combinations)
         )
 
     case_ids = set(parameters["case_id"])
@@ -307,8 +297,7 @@ def load_results(
     }
 
     investment = investment.loc[
-        investment["case_id"].isin(case_ids)
-        & investment["metric"].isin(metrics),
+        investment["case_id"].isin(case_ids) & investment["metric"].isin(metrics),
         ["case_id", "metric", "value"],
     ].copy()
 
@@ -324,8 +313,7 @@ def load_results(
 
         raise ValueError(
             "investment_metrics.parquet contains duplicate "
-            "(case_id, metric) rows:\n"
-            + duplicates.head(30).to_string(index=False)
+            "(case_id, metric) rows:\n" + duplicates.head(30).to_string(index=False)
         )
 
     investment = investment.pivot(
@@ -352,19 +340,19 @@ def load_results(
         validate="one_to_one",
     )
 
-    data["ldes_capacity_error_pct"] = (
-        100.0 * data["ldes_capacity_error_signed"]
-    )
-    data["capex_weighted_macme_pct"] = (
-        100.0 * data["macme_capex_weighted_annualised"]
-    )
+    data["ldes_capacity_error_pct"] = 100.0 * data["ldes_capacity_error_signed"]
+    data["capex_weighted_macme_pct"] = 100.0 * data["macme_capex_weighted_annualised"]
 
-    missing = data[
-        [
-            "ldes_capacity_error_pct",
-            "capex_weighted_macme_pct",
+    missing = (
+        data[
+            [
+                "ldes_capacity_error_pct",
+                "capex_weighted_macme_pct",
+            ]
         ]
-    ].isna().any(axis=1)
+        .isna()
+        .any(axis=1)
+    )
 
     if missing.any():
         missing_ids = data.loc[missing, "case_id"].tolist()
@@ -385,14 +373,11 @@ def build_summary(data: pd.DataFrame) -> pd.DataFrame:
         ("ldes_capacity_error_pct", "ldes_capacity_error_pct"),
         ("capex_weighted_macme_pct", "capex_weighted_macme_pct"),
     ]:
-        summary = (
-            data.groupby(["horizon_duration", "lambda_soc"], as_index=False)
-            .agg(
-                n=(value_column, "size"),
-                q25=(value_column, lambda x: x.quantile(0.25)),
-                median=(value_column, "median"),
-                q75=(value_column, lambda x: x.quantile(0.75)),
-            )
+        summary = data.groupby(["horizon_duration", "lambda_soc"], as_index=False).agg(
+            n=(value_column, "size"),
+            q25=(value_column, lambda x: x.quantile(0.25)),
+            median=(value_column, "median"),
+            q75=(value_column, lambda x: x.quantile(0.75)),
         )
         summary["metric"] = metric_name
         frames.append(summary)
@@ -407,12 +392,8 @@ def validate_plot_inputs(
 ) -> None:
     """Print the selected experiment dimensions."""
     countries = sorted(str(x) for x in data["country"].dropna().unique())
-    horizons = sorted(
-        int(x) for x in data["horizon_duration"].dropna().unique()
-    )
-    weights = sorted(
-        float(x) for x in data["lambda_soc"].dropna().unique()
-    )
+    horizons = sorted(int(x) for x in data["horizon_duration"].dropna().unique())
+    weights = sorted(float(x) for x in data["lambda_soc"].dropna().unique())
     actual_k = sorted(int(x) for x in data["k_periods"].dropna().unique())
 
     print("Figure 6 — Horizon sensitivity (median + IQR)")
@@ -428,10 +409,7 @@ def validate_plot_inputs(
 def build_wp_colours() -> dict[float, object]:
     """Map W_P=0..1 onto the lower 90% of the plasma colour map."""
     cmap = plt.get_cmap("plasma")
-    return {
-        wp: cmap(PLASMA_MIN + wp * (PLASMA_MAX - PLASMA_MIN))
-        for wp in WP_ORDER
-    }
+    return {wp: cmap(PLASMA_MIN + wp * (PLASMA_MAX - PLASMA_MIN)) for wp in WP_ORDER}
 
 
 def build_wp_offsets(
@@ -462,16 +440,13 @@ def add_metric_panel(
 ) -> None:
     """Plot one horizon-sensitivity metric using median markers and IQR."""
     horizon_positions = {
-        horizon: float(index)
-        for index, horizon in enumerate(HORIZON_ORDER)
+        horizon: float(index) for index, horizon in enumerate(HORIZON_ORDER)
     }
 
     panel = summary.loc[summary["metric"].eq(metric_name)].copy()
 
     for horizon in HORIZON_ORDER:
-        horizon_data = panel.loc[
-            panel["horizon_duration"].eq(horizon)
-        ]
+        horizon_data = panel.loc[panel["horizon_duration"].eq(horizon)]
         horizon_x = horizon_positions[horizon]
 
         for wp in WP_ORDER:
@@ -581,9 +556,7 @@ def make_figure(
 ) -> plt.Figure:
     """Build the two-panel horizon figure."""
     if width_px <= 0 or height_px <= 0 or dpi <= 0:
-        raise ValueError(
-            "width-px, height-px, and dpi must all be positive."
-        )
+        raise ValueError("width-px, height-px, and dpi must all be positive.")
 
     figsize = (width_px / dpi, height_px / dpi)
     wp_colours = build_wp_colours()
@@ -683,9 +656,7 @@ def make_figure(
         fig.text(
             AXES_CENTER,
             0.957,
-            (
-                r"Markers show medians; whiskers show Q25-Q75."
-            ),
+            (r"Markers show medians; whiskers show Q25-Q75."),
             ha="center",
             va="top",
             fontsize=9.2,
