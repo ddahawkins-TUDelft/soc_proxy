@@ -29,10 +29,10 @@ Source:
     results/2_5_10_year/*.parquet
 
 Outputs:
-    results/figures/fig_6_horizon_results_iqr/
-        fig_6_horizon_results_iqr.png
-        fig_6_horizon_results_iqr.pdf
-        fig_6_horizon_results_iqr_summary.csv
+    results/figures/fig_horizon_results_iqr/
+        fig_horizon_results_iqr.png
+        fig_horizon_results_iqr.pdf
+        fig_horizon_results_iqr_summary.csv
 """
 
 from __future__ import annotations
@@ -52,8 +52,8 @@ from matplotlib.ticker import MultipleLocator
 # ---------------------------------------------------------------------------
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
-DEFAULT_OUTPUT_DIR = Path("results/figures/fig_6_horizon_results_iqr")
-OUTPUT_STEM = "fig_6_horizon_results_iqr"
+DEFAULT_OUTPUT_DIR = Path("results/figures/fig_horizon_results_iqr")
+OUTPUT_STEM = "fig_horizon_results_iqr"
 
 DEFAULT_WIDTH_PX = 1500
 DEFAULT_HEIGHT_PX = 3000

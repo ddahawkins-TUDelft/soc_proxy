@@ -31,10 +31,10 @@ Source:
     results/2_5_10_year/*.parquet
 
 Outputs:
-    results/figures/fig_5_LDES_cap_improvement/
-        fig_5_LDES_cap_improvement.png
-        fig_5_LDES_cap_improvement.pdf
-        fig_5_LDES_cap_improvement_summary.csv
+    results/figures/fig_LDES_cap_improvement/
+        fig_LDES_cap_improvement.png
+        fig_LDES_cap_improvement.pdf
+        fig_LDES_cap_improvement_summary.csv
 """
 
 from __future__ import annotations
@@ -56,8 +56,8 @@ from matplotlib.ticker import MultipleLocator
 METRIC_NAME = "ldes_capacity_error_signed"
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
-DEFAULT_OUTPUT_DIR = Path("results/figures/fig_5_LDES_cap_improvement")
-OUTPUT_STEM = "fig_5_LDES_cap_improvement"
+DEFAULT_OUTPUT_DIR = Path("results/figures/fig_LDES_cap_improvement")
+OUTPUT_STEM = "fig_LDES_cap_improvement"
 
 DEFAULT_WIDTH_PX = 1800
 DEFAULT_HEIGHT_PX = 1200

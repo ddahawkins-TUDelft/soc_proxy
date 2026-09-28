@@ -10,7 +10,7 @@ The figure is intentionally narrow in scope:
 - within-k channels: SoC proxy weight W_P
 
 Outputs are written as both PNG and PDF to:
-    results/figures/fig_4_weighted_MACME_results/
+    results/figures/fig_weighted_MACME_results/
 
 The PNG canvas size can be specified directly in pixels. The PDF uses the
 same physical figure dimensions and remains vector-based.
@@ -34,8 +34,8 @@ from matplotlib.ticker import MultipleLocator
 METRIC_NAME = 'macme_capex_weighted_annualised'
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
-DEFAULT_OUTPUT_DIR = Path("results/figures/fig_4_weighted_MACME_results")
-OUTPUT_STEM = "fig_4_weighted_MACME_results"
+DEFAULT_OUTPUT_DIR = Path("results/figures/fig_weighted_MACME_results")
+OUTPUT_STEM = "fig_weighted_MACME_results"
 
 DEFAULT_WIDTH_PX = 2400
 DEFAULT_HEIGHT_PX = 1200

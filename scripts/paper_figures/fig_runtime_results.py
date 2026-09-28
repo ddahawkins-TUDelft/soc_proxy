@@ -29,11 +29,11 @@ Source:
     results/2_5_10_year/parameters.parquet
 
 Outputs:
-    results/figures/fig_7_runtime_results/
-        fig_7_runtime_results.png
-        fig_7_runtime_results.pdf
-        fig_7_runtime_results_clustered_summary.csv
-        fig_7_runtime_results_component_summary.csv
+    results/figures/fig_runtime_results/
+        fig_runtime_results.png
+        fig_runtime_results.pdf
+        fig_runtime_results_clustered_summary.csv
+        fig_runtime_results_component_summary.csv
 """
 
 from __future__ import annotations
@@ -53,8 +53,8 @@ from matplotlib.ticker import FixedLocator, FixedFormatter, NullFormatter
 # ---------------------------------------------------------------------------
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
-DEFAULT_OUTPUT_DIR = Path("results/figures/fig_7_runtime_results")
-OUTPUT_STEM = "fig_7_runtime_results"
+DEFAULT_OUTPUT_DIR = Path("results/figures/fig_runtime_results")
+OUTPUT_STEM = "fig_runtime_results"
 
 DEFAULT_WIDTH_PX = 1600
 DEFAULT_HEIGHT_PX = 1200
