@@ -116,9 +116,37 @@ experiments:
       start_date: 2014-01-01
       end_date: 2024-01-01
 
+  BE_2006:
+    data_params:
+      country: BE
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+
   BE_2010:
     data_params:
       country: BE
+    soc_proxy_params:
+      renewables:
+        solar:
+          weight: 0.51 
+        onshore_wind:
+          weight: 0.24
+        offshore_wind:
+          weight: 0.25
+  
+  BE_2014:
+    data_params:
+      country: BE
+      start_date: 2014-01-01
+      end_date: 2024-01-01
     soc_proxy_params:
       renewables:
         solar:

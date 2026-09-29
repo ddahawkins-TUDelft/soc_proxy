@@ -1,32 +1,40 @@
-"""Summarise reference SoC-proxy approximation quality for the paper table.
+"""Summarise endogenous SoC-proxy calibration and approximation quality.
 
-The script extracts proxy-approximation metrics for unique 10-year
-country/weather-year-set cases and reports the median and full range by country.
+The script extracts, for each unique 10-year country/weather-year-set case:
 
-Metrics retained from signal_metrics.parquet:
+* the resolved endogenous proxy margin stored as ``margin_value`` in
+  ``parameters.parquet``; and
+* unwindowed reference-proxy approximation metrics from
+  ``signal_metrics.parquet``.
+
+Metrics retained from ``signal_metrics.parquet``::
+
     error_family = "reference_approximation"
     signal_type = "level"
     metric in {"pearson", "rmse", "mbe"}
     window_half_width_days is empty / null
 
-Multiple model configurations can share the same country and weather-year set.
-Because these are reference-proxy statistics, they should be identical across
-such duplicate case_ids. The script therefore collapses them to one result per:
+Multiple clustered model configurations can share the same country and weather
+window. Because the original SoC Proxy (and therefore its selected margin and
+reference-approximation metrics) is a property of that original chronology,
+these values should be identical across duplicate case IDs. The script checks
+that assumption before collapsing to one row per unique weather set.
 
-    country + start_date + end_date + metric
+Source::
 
-and raises an error if duplicate case_ids disagree materially.
-
-Source:
     results/2_5_10_year/
         parameters.parquet
         signal_metrics.parquet
 
-Outputs:
+Outputs::
+
     results/tables/table_ref_proxy_quality/
         table_ref_proxy_quality_summary.csv
         table_ref_proxy_quality_cases.csv
         table_ref_proxy_quality.tex
+
+The LaTeX table is transposed for a single-column paper layout: measures are
+rows and countries are columns. Each cell reports median (full range).
 """
 
 from __future__ import annotations
@@ -46,15 +54,26 @@ HORIZON_TOLERANCE_YEARS = 0.10
 
 ERROR_FAMILY = "reference_approximation"
 SIGNAL_TYPE = "level"
-METRICS = ("pearson", "rmse", "mbe")
+METRICS = ("pearson", "rmse")
 
 DUPLICATE_VALUE_ATOL = 1e-10
+
+# Preferred display order; any additional countries are appended alphabetically.
+PREFERRED_COUNTRY_ORDER = ("BE", "NL")
+
+MEASURE_ORDER = ("selected_margin", "pearson", "rmse")
+MEASURE_LABELS = {
+    "selected_margin": r"Selected margin $m$",
+    "pearson": r"Pearson $r$",
+    "rmse": r"RMSE (TWh)",
+}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Summarise 10-year reference SoC-proxy approximation metrics by country."
+            "Summarise 10-year endogenous proxy margins and reference "
+            "SoC-proxy approximation metrics by country."
         )
     )
     parser.add_argument(
@@ -87,11 +106,12 @@ def require_columns(
 
 
 def load_ten_year_cases(source_dir: Path) -> pd.DataFrame:
+    """Load 10-year cases including the resolved case-specific proxy margin."""
     parameters = pd.read_parquet(source_dir / "parameters.parquet")
 
     require_columns(
         parameters,
-        {"case_id", "country", "start_date", "end_date"},
+        {"case_id", "country", "start_date", "end_date", "margin_value"},
         table_name="parameters.parquet",
     )
 
@@ -99,6 +119,9 @@ def load_ten_year_cases(source_dir: Path) -> pd.DataFrame:
     parameters["case_id"] = parameters["case_id"].astype(str)
     parameters["start_date"] = pd.to_datetime(parameters["start_date"])
     parameters["end_date"] = pd.to_datetime(parameters["end_date"])
+    parameters["margin_value"] = pd.to_numeric(
+        parameters["margin_value"], errors="coerce"
+    )
 
     parameters["horizon_years"] = (
         parameters["end_date"] - parameters["start_date"]
@@ -118,9 +141,31 @@ def load_ten_year_cases(source_dir: Path) -> pd.DataFrame:
             "No approximately 10-year cases were found in parameters.parquet."
         )
 
-    return parameters[
-        ["case_id", "country", "start_date", "end_date", "horizon_years"]
-    ].drop_duplicates()
+    missing_margin = parameters["margin_value"].isna()
+    if missing_margin.any():
+        examples = parameters.loc[
+            missing_margin,
+            ["case_id", "country", "start_date", "end_date"],
+        ].head(20)
+        raise ValueError(
+            "Some 10-year cases do not contain a resolved margin_value. "
+            "The paper table expects the selected endogenous margin to have "
+            "been persisted in parameters.parquet. Example rows:\n"
+            + examples.to_string(index=False)
+        )
+
+    keep = [
+        "case_id",
+        "country",
+        "start_date",
+        "end_date",
+        "horizon_years",
+        "margin_value",
+    ]
+    if "margin_mode" in parameters.columns:
+        keep.append("margin_mode")
+
+    return parameters[keep].drop_duplicates()
 
 
 def empty_window_mask(series: pd.Series) -> pd.Series:
@@ -202,11 +247,55 @@ def load_reference_proxy_metrics(
     return metrics[["case_id", "metric", "value"]]
 
 
-def collapse_to_unique_weather_sets(
+def collapse_margins_to_unique_weather_sets(
+    ten_year_cases: pd.DataFrame,
+) -> pd.DataFrame:
+    """Collapse repeated model configurations to one selected margin per horizon."""
+    key = ["country", "start_date", "end_date"]
+
+    consistency = ten_year_cases.groupby(key, as_index=False).agg(
+        n_case_ids=("case_id", "nunique"),
+        margin_min=("margin_value", "min"),
+        margin_max=("margin_value", "max"),
+    )
+
+    inconsistent = consistency.loc[
+        ~np.isclose(
+            consistency["margin_min"],
+            consistency["margin_max"],
+            atol=DUPLICATE_VALUE_ATOL,
+            rtol=0.0,
+        )
+    ]
+
+    if not inconsistent.empty:
+        raise ValueError(
+            "Resolved proxy margins differ across case_ids that represent the "
+            "same country/weather-year set. The selected margin should be a "
+            "property of the original chronology. Inspect these rows first:\n"
+            + inconsistent.head(40).to_string(index=False)
+        )
+
+    margins = (
+        ten_year_cases.groupby(key, as_index=False)
+        .agg(
+            selected_margin=("margin_value", "mean"),
+            n_duplicate_case_ids=("case_id", "nunique"),
+        )
+        .sort_values(["country", "start_date"])
+        .reset_index(drop=True)
+    )
+
+    return margins
+
+
+def collapse_metrics_to_unique_weather_sets(
     ten_year_cases: pd.DataFrame,
     metrics: pd.DataFrame,
 ) -> pd.DataFrame:
-    data = ten_year_cases.merge(
+    data = ten_year_cases[
+        ["case_id", "country", "start_date", "end_date"]
+    ].merge(
         metrics,
         on="case_id",
         how="inner",
@@ -242,7 +331,7 @@ def collapse_to_unique_weather_sets(
             + inconsistent.head(40).to_string(index=False)
         )
 
-    unique_cases = (
+    unique_metrics = (
         data.groupby(key, as_index=False)
         .agg(
             value=("value", "mean"),
@@ -252,62 +341,107 @@ def collapse_to_unique_weather_sets(
         .reset_index(drop=True)
     )
 
-    return unique_cases
+    return unique_metrics
 
 
-def build_summary(unique_cases: pd.DataFrame) -> pd.DataFrame:
-    return (
-        unique_cases.groupby(["country", "metric"], as_index=False)
-        .agg(
-            n=("value", "size"),
-            median=("value", "median"),
-            minimum=("value", "min"),
-            maximum=("value", "max"),
-        )
-        .sort_values(["country", "metric"])
-        .reset_index(drop=True)
+def build_case_table(
+    margins: pd.DataFrame,
+    unique_metrics: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return one wide row per country/weather set for convenient inspection."""
+    metric_wide = unique_metrics.pivot(
+        index=["country", "start_date", "end_date"],
+        columns="metric",
+        values="value",
+    ).reset_index()
+    metric_wide.columns.name = None
+
+    cases = margins.merge(
+        metric_wide,
+        on=["country", "start_date", "end_date"],
+        how="inner",
+        validate="one_to_one",
     )
 
+    missing_metrics = [metric for metric in METRICS if metric not in cases.columns]
+    if missing_metrics:
+        raise ValueError(
+            "The case table is missing expected reference-proxy metrics: "
+            f"{missing_metrics}"
+        )
 
-def format_value(metric: str, value: float) -> str:
-    if metric == "pearson":
-        return f"{value:.2f}"
+    return cases.sort_values(["country", "start_date"]).reset_index(drop=True)
+
+
+def build_summary(case_table: pd.DataFrame) -> pd.DataFrame:
+    """Return tidy country/measure summaries used by CSV and LaTeX outputs."""
+    rows: list[dict[str, object]] = []
+
+    for country, country_data in case_table.groupby("country", sort=True):
+        for measure in MEASURE_ORDER:
+            values = pd.to_numeric(country_data[measure], errors="coerce").dropna()
+            if values.empty:
+                continue
+
+            rows.append(
+                {
+                    "country": country,
+                    "measure": measure,
+                    "n": int(values.size),
+                    "median": float(values.median()),
+                    "minimum": float(values.min()),
+                    "maximum": float(values.max()),
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
+def ordered_countries(summary: pd.DataFrame) -> list[str]:
+    available = list(summary["country"].drop_duplicates())
+    preferred = [c for c in PREFERRED_COUNTRY_ORDER if c in available]
+    extras = sorted(c for c in available if c not in preferred)
+    return preferred + extras
+
+
+def format_stat(measure: str, value: float) -> str:
+    if measure == "selected_margin":
+        return f"{100.0 * value:.1f}\\%"
     return f"{value:.2f}"
 
 
 def build_latex_table(summary: pd.DataFrame) -> str:
-    countries = list(summary["country"].drop_duplicates())
+    """Build a narrow transposed table suitable for one paper column."""
+    countries = ordered_countries(summary)
+    lookup = {
+        (row.country, row.measure): row
+        for row in summary.itertuples(index=False)
+    }
 
-    lookup = {(row.country, row.metric): row for row in summary.itertuples(index=False)}
+    column_spec = "l" + "c" * len(countries)
+    header = "Measure & " + " & ".join(countries) + r" \\"
 
     lines = [
-        r"\begin{table}[]",
-        r"\begin{tabular}{@{}lcccccc@{}}",
+        r"\begin{table}[t]",
+        r"\centering",
+        rf"\begin{{tabular}}{{@{{}}{column_spec}@{{}}}}",
         r"\toprule",
-        (
-            r"\multicolumn{1}{c}{} & "
-            r"\multicolumn{2}{c}{Pearson $R$} & "
-            r"\multicolumn{2}{c}{RMSE} & "
-            r"\multicolumn{2}{c}{MBE} \\ \midrule"
-        ),
-        r"Country & Median & Range & Median & Range & Median & Range \\",
+        header,
+        r"\midrule",
     ]
 
-    for country in countries:
-        cells = [str(country)]
-
-        for metric in ("pearson", "rmse", "mbe"):
-            row = lookup.get((country, metric))
-
+    for measure in MEASURE_ORDER:
+        cells = [MEASURE_LABELS[measure]]
+        for country in countries:
+            row = lookup.get((country, measure))
             if row is None:
-                cells.extend(["--", "--"])
+                cells.append("--")
                 continue
 
-            median = format_value(metric, float(row.median))
-            minimum = format_value(metric, float(row.minimum))
-            maximum = format_value(metric, float(row.maximum))
-
-            cells.extend([median, f"{minimum}--{maximum}"])
+            median = format_stat(measure, float(row.median))
+            minimum = format_stat(measure, float(row.minimum))
+            maximum = format_stat(measure, float(row.maximum))
+            cells.append(f"{median} ({minimum}--{maximum})")
 
         lines.append(" & ".join(cells) + r" \\")
 
@@ -326,12 +460,12 @@ def build_latex_table(summary: pd.DataFrame) -> str:
             r"\bottomrule",
             r"\end{tabular}",
             (
-                r"\caption{SoC proxy approximation quality across unique "
-                r"10-year reference weather-year sets ("
+                r"\caption{Endogenous SoC Proxy calibration and approximation "
+                r"quality across unique 10-year reference weather-year sets ("
                 + n_text
-                + r"). Reported are the median and full range of Pearson "
-                r"correlation, RMSE, and mean bias error (MBE) between the "
-                r"proxy and the CEM SoC trajectory.}"
+                + r"). Cells report median (full range). The selected margin "
+                r"$m$ is the case-specific endogenous margin; approximation "
+                r"metrics compare the resulting proxy with the CEM SoC trajectory.}"
             ),
             r"\label{tab:ref-proxy-qual}",
             r"\end{table}",
@@ -342,14 +476,14 @@ def build_latex_table(summary: pd.DataFrame) -> str:
 
 
 def print_summary(
-    unique_cases: pd.DataFrame,
+    case_table: pd.DataFrame,
     summary: pd.DataFrame,
 ) -> None:
-    print("Reference SoC-proxy approximation quality")
-    print("=========================================")
+    print("Endogenous SoC-proxy calibration and approximation quality")
+    print("==========================================================")
 
     weather_sets = (
-        unique_cases[["country", "start_date", "end_date"]]
+        case_table[["country", "start_date", "end_date"]]
         .drop_duplicates()
         .groupby("country")
         .size()
@@ -360,21 +494,35 @@ def print_summary(
         print(f"  {country}: {count}")
 
     print("\nMedian and range:")
-    for country in summary["country"].drop_duplicates():
+    for country in ordered_countries(summary):
         print(f"\n{country}")
         country_data = summary.loc[summary["country"].eq(country)]
 
-        for row in country_data.itertuples(index=False):
-            print(
-                f"  {row.metric:8s}: "
-                f"median={row.median:.4g}, "
-                f"range={row.minimum:.4g} to {row.maximum:.4g}, "
-                f"n={int(row.n)}"
-            )
+        for measure in MEASURE_ORDER:
+            match = country_data.loc[country_data["measure"].eq(measure)]
+            if match.empty:
+                continue
+            row = match.iloc[0]
+
+            if measure == "selected_margin":
+                print(
+                    f"  {measure:16s}: "
+                    f"median={100 * row['median']:.1f}%, "
+                    f"range={100 * row['minimum']:.1f}% to "
+                    f"{100 * row['maximum']:.1f}%, "
+                    f"n={int(row['n'])}"
+                )
+            else:
+                print(
+                    f"  {measure:16s}: "
+                    f"median={row['median']:.4g}, "
+                    f"range={row['minimum']:.4g} to {row['maximum']:.4g}, "
+                    f"n={int(row['n'])}"
+                )
 
 
 def save_outputs(
-    unique_cases: pd.DataFrame,
+    case_table: pd.DataFrame,
     summary: pd.DataFrame,
     latex: str,
     *,
@@ -386,7 +534,7 @@ def save_outputs(
     summary_path = output_dir / "table_ref_proxy_quality_summary.csv"
     latex_path = output_dir / "table_ref_proxy_quality.tex"
 
-    unique_cases.to_csv(cases_path, index=False)
+    case_table.to_csv(cases_path, index=False)
     summary.to_csv(summary_path, index=False)
     latex_path.write_text(latex, encoding="utf-8")
 
@@ -397,24 +545,24 @@ def main() -> None:
     args = parse_args()
 
     ten_year_cases = load_ten_year_cases(args.source_dir)
-
     metrics = load_reference_proxy_metrics(
         args.source_dir,
         ten_year_cases,
     )
 
-    unique_cases = collapse_to_unique_weather_sets(
+    margins = collapse_margins_to_unique_weather_sets(ten_year_cases)
+    unique_metrics = collapse_metrics_to_unique_weather_sets(
         ten_year_cases,
         metrics,
     )
-
-    summary = build_summary(unique_cases)
+    case_table = build_case_table(margins, unique_metrics)
+    summary = build_summary(case_table)
     latex = build_latex_table(summary)
 
-    print_summary(unique_cases, summary)
+    print_summary(case_table, summary)
 
     outputs = save_outputs(
-        unique_cases,
+        case_table,
         summary,
         latex,
         output_dir=args.output_dir,

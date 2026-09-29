@@ -1,4 +1,4 @@
-"""Create an appendix TSA-method sensitivity figure using median + IQR.
+"""Create an TSA-method sensitivity figure using median + IQR.
 
 The figure evaluates how the SoC proxy behaves across different TSA methods
 for 10-year cases only, using two vertically stacked panels:
@@ -43,8 +43,8 @@ from matplotlib.ticker import MultipleLocator
 
 
 DEFAULT_SOURCE_DIR = Path("results/2_5_10_year")
-DEFAULT_OUTPUT_DIR = Path("results/figures/fig_appendix_tsa_methods_iqr")
-OUTPUT_STEM = "fig_appendix_tsa_methods_iqr"
+DEFAULT_OUTPUT_DIR = Path("results/figures/fig_tsa_methods_iqr")
+OUTPUT_STEM = "fig_tsa_methods_iqr"
 
 DEFAULT_WIDTH_PX = 1600
 DEFAULT_HEIGHT_PX = 2400
@@ -96,7 +96,7 @@ METHOD_LABELS = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Create the appendix TSA-method sensitivity figure using "
+            "Create the TSA-method sensitivity figure using "
             "median markers and interquartile-range whiskers."
         )
     )
@@ -633,7 +633,7 @@ def main() -> None:
     )
     summary = build_summary(data)
 
-    print("Appendix TSA-method sensitivity — median + IQR")
+    print("TSA-method sensitivity — median + IQR")
     print("================================================")
     print(f"Cases:          {len(data)}")
     print(f"Horizon:        ~{TARGET_HORIZON_YEARS:g} years")

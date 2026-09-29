@@ -407,9 +407,28 @@ def validate_plot_inputs(
 
 
 def build_wp_colours() -> dict[float, object]:
-    """Map W_P=0..1 onto the lower 90% of the plasma colour map."""
+    """Use paper-wide W_P colours, with W_P=0 shown in grey."""
     cmap = plt.get_cmap("plasma")
-    return {wp: cmap(PLASMA_MIN + wp * (PLASMA_MAX - PLASMA_MIN)) for wp in WP_ORDER}
+
+    wp_positive_min = 0.25
+    wp_positive_max = 1.0
+
+    colours = {}
+
+    for wp in WP_ORDER:
+        if np.isclose(wp, 0.0):
+            colours[wp] = "0.45"
+        else:
+            position = (
+                (wp - wp_positive_min)
+                / (wp_positive_max - wp_positive_min)
+            )
+            colours[wp] = cmap(
+                PLASMA_MIN
+                + position * (PLASMA_MAX - PLASMA_MIN)
+            )
+
+    return colours
 
 
 def build_wp_offsets(

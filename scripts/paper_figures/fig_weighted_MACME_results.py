@@ -274,12 +274,28 @@ def validate_plot_inputs(data: pd.DataFrame) -> None:
 
 
 def build_wp_colours(weights: list[float]) -> dict[float, object]:
-    """Map W_P=0..1 onto the lower 90% of the plasma colour map."""
+    """Use grey for W_P=0 and span plasma across positive W_P values."""
     cmap = plt.get_cmap("plasma")
-    return {
-        weight: cmap(PLASMA_MIN + weight * (PLASMA_MAX - PLASMA_MIN))
-        for weight in weights
-    }
+    positive = [w for w in weights if not np.isclose(w, 0.0)]
+
+    colours = {}
+
+    for weight in weights:
+        if np.isclose(weight, 0.0):
+            colours[weight] = "0.5"
+        elif len(positive) == 1:
+            colours[weight] = cmap((PLASMA_MIN + PLASMA_MAX) / 2)
+        else:
+            position = (
+                (weight - min(positive))
+                / (max(positive) - min(positive))
+            )
+            colours[weight] = cmap(
+                PLASMA_MIN
+                + position * (PLASMA_MAX - PLASMA_MIN)
+            )
+
+    return colours
 
 
 def build_wp_offsets(

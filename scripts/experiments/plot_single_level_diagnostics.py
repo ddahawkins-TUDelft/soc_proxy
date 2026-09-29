@@ -54,7 +54,7 @@ import pandas as pd
 #   PROXY_WEIGHT = 0.5   -> only W_P = 0.5
 #   PROXY_WEIGHT = 0.25  -> only W_P = 0.25
 #   PROXY_WEIGHT = None  -> pool all proxy weights
-PROXY_WEIGHT = 0.5
+PROXY_WEIGHT = 1
 
 
 # Capacity-error target.
