@@ -1,0 +1,155 @@
+# Paper validation batch: 10-year GB cases
+#
+# Design:
+#   TSA method: kmeans + medoid
+#   Proxy weights: WP = 0.5
+#   Representative-period counts: k = 10, 50, 30
+#   10-year horizons: 2006-16, 2008-18, 2010-20, 2012-22, 2014-24
+#
+defaults:
+  dispatch_mode: tsa
+  data_params:
+    country: GB
+    start_date: 2010-01-01
+    end_date: 2020-01-01
+  soc_proxy_params:
+    demand_field: demand_power
+    renewables:
+      solar:
+        weight: 0.07
+        annualised_capacity_cost: 0.069366234867
+        variable_cost: 0.0
+      onshore_wind:
+        weight: 0.88
+        annualised_capacity_cost: 0.136565982927
+        variable_cost: 2.0e-06
+      offshore_wind:
+        weight: 0.05
+        annualised_capacity_cost: 0.279506201625
+        variable_cost: 5.0e-06
+    storage:
+      charging_efficiency: 0.6435
+      discharging_efficiency: 0.5544
+      annualised_energy_capacity_cost: 0.00031902315
+      annualised_charge_power_cost: 0.101531096308
+      annualised_discharge_power_cost: 0.13427331557
+      charge_variable_cost: 0.0
+      discharge_variable_cost: 6.8964714e-05
+    soc_decomposition:
+      method: gaussian
+      time_horizon_hours: 24
+    margin_mode: auto
+  tsa_params:
+    k_periods: 10
+    period_duration: 1D
+    preserve_column_means: true
+    soc_proxy:
+      enabled: true
+      lambda_soc: 0.5
+      proxy_field_name: surplus_LDES
+    cluster:
+      method: kmeans
+      random_state: 42
+    representation:
+      method: medoid
+  calliope_params: {}
+  solver_params:
+    solver: gurobi
+    solver_options:
+      NumericFocus: 2
+  output_params:
+    save_capacities: true
+    save_costs: true
+    save_metrics: true
+experiments:
+  GB_2006_k10:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    tsa_params:
+      k_periods: 10
+  GB_2006_k50:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    tsa_params:
+      k_periods: 50
+  GB_2006_k30:
+    data_params:
+      start_date: 2006-01-01
+      end_date: 2016-01-01
+    tsa_params:
+      k_periods: 30
+  GB_2008_k10:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+    tsa_params:
+      k_periods: 10
+  GB_2008_k50:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+    tsa_params:
+      k_periods: 50
+  GB_2008_k30:
+    data_params:
+      start_date: 2008-01-01
+      end_date: 2018-01-01
+    tsa_params:
+      k_periods: 30
+  GB_2010_k10:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    tsa_params:
+      k_periods: 10
+  GB_2010_k50:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    tsa_params:
+      k_periods: 50
+  GB_2010_k30:
+    data_params:
+      start_date: 2010-01-01
+      end_date: 2020-01-01
+    tsa_params:
+      k_periods: 30
+  GB_2012_k10:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+    tsa_params:
+      k_periods: 10
+  GB_2012_k50:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+    tsa_params:
+      k_periods: 50
+  GB_2012_k30:
+    data_params:
+      start_date: 2012-01-01
+      end_date: 2022-01-01
+    tsa_params:
+      k_periods: 30
+  GB_2014_k10:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+    tsa_params:
+      k_periods: 10
+  GB_2014_k50:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+    tsa_params:
+      k_periods: 50
+  GB_2014_k30:
+    data_params:
+      start_date: 2014-01-01
+      end_date: 2024-01-01
+    tsa_params:
+      k_periods: 30
+  
