@@ -43,7 +43,7 @@ BOX_WIDTH_FRACTION = 0.10
 
 def plot_smoothing_sensitivity(
     *,
-    manifest_path: str | Path = ("results/sensitivity_smoothing_manifest.parquet"),
+    manifest_path: str | Path = ("results/sensitivity_smoothing/sensitivity_smoothing_manifest.parquet"),
     results_dir: str | Path = "results",
     output_path: str | Path | None = None,
     connect_medians: bool = True,
