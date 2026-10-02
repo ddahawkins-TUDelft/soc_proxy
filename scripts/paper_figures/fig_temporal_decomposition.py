@@ -8,7 +8,7 @@ Visual encoding
 - x-axis: smoothing timescale (hours; logarithmic scale)
 - colour: decomposition method
 - marker: median across pooled country/weather cases
-- vertical whisker: interquartile range (Q25--Q75)
+- vertical whisker: interquartile range (Q25-Q75)
 - black outline: selected Gaussian 24-hour formulation
 """
 
@@ -614,19 +614,19 @@ def make_figure(
             for method in methods
         ]
 
-        legend_handles.append(
-            Line2D(
-                [0],
-                [0],
-                linestyle="none",
-                marker="o",
-                markerfacecolor="none",
-                markeredgecolor="black",
-                markeredgewidth=SELECTED_EDGEWIDTH,
-                markersize=7.2,
-                label="Selected: Gaussian, 24 h",
-            )
-        )
+        # legend_handles.append(
+        #     Line2D(
+        #         [0],
+        #         [0],
+        #         linestyle="none",
+        #         marker="o",
+        #         markerfacecolor="none",
+        #         markeredgecolor="black",
+        #         markeredgewidth=SELECTED_EDGEWIDTH,
+        #         markersize=7.2,
+        #         label="Selected: Gaussian, 24 h",
+        #     )
+        # )
 
         fig.legend(
             handles=legend_handles,
@@ -641,7 +641,7 @@ def make_figure(
         fig.text(
             0.56,
             0.91,
-            "Markers show medians; whiskers show Q25--Q75.",
+            "Markers show medians; whiskers show Q25-Q75.",
             ha="center",
             va="top",
             fontsize=7.5,
